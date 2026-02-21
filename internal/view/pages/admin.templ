@@ -1,0 +1,135 @@
+package pages
+
+import (
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view/layout"
+)
+
+type AdminStats struct {
+	TotalUsers       int64
+	TotalDeadLetters int64
+	ActiveJobs       int64
+	FailedJobs       int64
+	RateLimits       map[string]RateLimitStatus
+	EmailProviders   []EmailProviderStatus
+}
+
+type RateLimitStatus struct {
+	RequestsPerSecond int
+	Burst            int
+	CurrentCount     int64
+}
+
+type EmailProviderStatus struct {
+	Name     string
+	Type     string
+	Enabled  bool
+	LastUsed string
+}
+
+templ Admin(user db.User, stats AdminStats) {
+	@layout.Base("Admin - GOTH Stack", db.Tenant{Name: "GOTH Stack"}) {
+		<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+			<div class="px-4 py-6 sm:px-0">
+				<div class="mb-6">
+					<h1 class="text-3xl font-bold text-gray-900">Admin Panel</h1>
+					<p class="text-gray-600 mt-1">Sistema de gerenciamento GOTH Stack</p>
+				</div>
+
+				<!-- Stats Overview -->
+				<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+					<div class="bg-white overflow-hidden shadow rounded-lg">
+						<div class="px-4 py-5 sm:p-6">
+							<dt class="text-sm font-medium text-gray-500 truncate">Total Users</dt>
+							<dd class="mt-1 text-3xl font-semibold text-gray-900">{ string(rune(stats.TotalUsers + '0')) }</dd>
+						</div>
+					</div>
+					<div class="bg-white overflow-hidden shadow rounded-lg">
+						<div class="px-4 py-5 sm:p-6">
+							<dt class="text-sm font-medium text-gray-500 truncate">Dead Letters</dt>
+							<dd class="mt-1 text-3xl font-semibold text-red-600">{ string(rune(stats.TotalDeadLetters + '0')) }</dd>
+						</div>
+					</div>
+					<div class="bg-white overflow-hidden shadow rounded-lg">
+						<div class="px-4 py-5 sm:p-6">
+							<dt class="text-sm font-medium text-gray-500 truncate">Active Jobs</dt>
+							<dd class="mt-1 text-3xl font-semibold text-green-600">{ string(rune(stats.ActiveJobs + '0')) }</dd>
+						</div>
+					</div>
+					<div class="bg-white overflow-hidden shadow rounded-lg">
+						<div class="px-4 py-5 sm:p-6">
+							<dt class="text-sm font-medium text-gray-500 truncate">Failed Jobs</dt>
+							<dd class="mt-1 text-3xl font-semibold text-orange-600">{ string(rune(stats.FailedJobs + '0')) }</dd>
+						</div>
+					</div>
+				</div>
+
+				<!-- Rate Limiting Section -->
+				<div class="bg-white shadow rounded-lg mb-8">
+					<div class="px-4 py-5 sm:px-6">
+						<h2 class="text-lg leading-6 font-medium text-gray-900">Rate Limiting</h2>
+						<p class="mt-1 max-w-2xl text-sm text-gray-500">Status atual dos limites de taxa por endpoint</p>
+					</div>
+					<div class="border-t border-gray-200">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Endpoint</th>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requests/Second</th>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Burst</th>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200">
+								for endpoint, status := range stats.RateLimits {
+									<tr>
+										<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{ endpoint }</td>
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ string(rune(status.RequestsPerSecond + '0')) }</td>
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ string(rune(status.Burst + '0')) }</td>
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ string(rune(status.CurrentCount + '0')) }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+
+				<!-- Email Providers Section -->
+				<div class="bg-white shadow rounded-lg">
+					<div class="px-4 py-5 sm:px-6">
+						<h2 class="text-lg leading-6 font-medium text-gray-900">Email Providers</h2>
+						<p class="mt-1 max-w-2xl text-sm text-gray-500">Provedores de email configurados</p>
+					</div>
+					<div class="border-t border-gray-200">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Used</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200">
+								for _, provider := range stats.EmailProviders {
+									<tr>
+										<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{ provider.Name }</td>
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ provider.Type }</td>
+										<td class="px-6 py-4 whitespace-nowrap">
+											if provider.Enabled {
+												<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+											} else {
+												<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Inactive</span>
+											}
+										</td>
+										<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ provider.LastUsed }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

@@ -91,3 +91,56 @@ DELETE FROM email_verifications WHERE email = ?;
 
 -- name: VerifyUser :exec
 UPDATE users SET is_verified = TRUE WHERE email = ?;
+
+-- === DEAD LETTER QUEUE ===
+
+-- name: MoveToDeadLetter :exec
+INSERT INTO dead_letter_jobs (original_job_id, tenant_id, type, payload, attempt_count, last_error)
+SELECT jobs.id, jobs.tenant_id, jobs.type, jobs.payload, jobs.attempt_count, jobs.last_error FROM jobs WHERE jobs.id = ?;
+
+-- name: DeleteJob :exec
+DELETE FROM jobs WHERE id = ?;
+
+-- name: ListDeadLetterJobs :many
+SELECT * FROM dead_letter_jobs 
+WHERE (?1 = '' OR type = ?1) 
+ORDER BY failed_at DESC 
+LIMIT ?2 OFFSET ?3;
+
+-- name: GetDeadLetterJob :one
+SELECT * FROM dead_letter_jobs WHERE id = ?;
+
+-- name: ReprocessDeadLetterJob :one
+INSERT INTO jobs (tenant_id, type, payload, run_at)
+SELECT tenant_id, type, payload, CURRENT_TIMESTAMP FROM dead_letter_jobs WHERE dead_letter_jobs.id = ?
+RETURNING *;
+
+-- name: DeleteDeadLetterJob :exec
+DELETE FROM dead_letter_jobs WHERE id = ?;
+
+-- name: CountDeadLetterJobs :one
+SELECT COUNT(*) FROM dead_letter_jobs;
+
+-- name: CountDeadLetterJobsByType :one
+SELECT COUNT(*) FROM dead_letter_jobs WHERE type = ?;
+
+-- name: CleanupDeadLetterJobs :exec
+DELETE FROM dead_letter_jobs 
+WHERE failed_at < datetime('now', '-14 days');
+
+-- === JOBS MANAGEMENT ===
+
+-- name: ListJobs :many
+SELECT * FROM jobs 
+WHERE (?1 = '' OR status = ?1)
+ORDER BY created_at DESC 
+LIMIT ?2 OFFSET ?3;
+
+-- name: CountJobs :one
+SELECT COUNT(*) FROM jobs WHERE (? = '' OR status = ?);
+
+-- name: CancelJob :exec
+UPDATE jobs SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending';
+
+-- name: RetryJob :exec
+UPDATE jobs SET status = 'pending', attempt_count = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?;

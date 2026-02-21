@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
+
+	"github.com/PauloHFS/goth/internal/logging"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -35,6 +38,9 @@ func Seed(ctx context.Context, dbConn *sql.DB) error {
 		return nil
 	}
 
-	fmt.Println("✅ Database seeded successfully: admin@admin.com / admin123")
+	logging.Get().Info("database seeded successfully",
+		slog.String("admin_email", "admin@admin.com"),
+		slog.String("default_password", "admin123"),
+	)
 	return nil
 }

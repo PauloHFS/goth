@@ -11,7 +11,7 @@ import (
 
 func RunCreateUser() {
 	if len(os.Args) < 4 {
-		fmt.Println("Usage: create-user <email> <password>")
+		os.Stderr.WriteString("Usage: create-user <email> <password>\n")
 		os.Exit(1)
 	}
 	email := os.Args[2]
@@ -36,8 +36,8 @@ func RunCreateUser() {
 		RoleID:       "user",
 	})
 	if err != nil {
-		fmt.Printf("failed to create user: %v\n", err)
+		os.Stderr.WriteString(fmt.Sprintf("failed to create user: %v\n", err))
 		os.Exit(1)
 	}
-	fmt.Printf("User %s created successfully\n", email)
+	os.Stdout.WriteString(fmt.Sprintf("User %s created successfully\n", email))
 }

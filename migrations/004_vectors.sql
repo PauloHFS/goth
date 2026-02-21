@@ -1,0 +1,11 @@
+-- ===========================================
+-- 004: Vector Search (sqlite-vec)
+-- ===========================================
+-- NOTE: The vectors table is created dynamically at runtime
+-- with the dimension specified in VECTOR_EMBEDDING_DIMENSION env var.
+-- See internal/vector/store.go EnsureTable() method.
+-- 
+-- Default dimension is 1536 (OpenAI ada-002).
+-- For Ollama models, use: 384, 768, etc.
+--
+-- This migration exists to mark that vector support is enabled.

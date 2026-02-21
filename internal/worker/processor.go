@@ -18,19 +18,27 @@ import (
 )
 
 type Processor struct {
-	db      *sql.DB
-	queries *db.Queries
-	logger  *slog.Logger
-	mailer  *mailer.Mailer
-	wg      sync.WaitGroup
+	config      *config.Config
+	db          *sql.DB
+	queries     *db.Queries
+	logger      *slog.Logger
+	mailer      *mailer.Mailer
+	wg          sync.WaitGroup
+	jobNotify   chan struct{}
+	rateLimiter *JobRateLimiter
+	dlq         *DeadLetterQueue
 }
 
 func New(cfg *config.Config, dbConn *sql.DB, q *db.Queries, l *slog.Logger) *Processor {
 	return &Processor{
-		db:      dbConn,
-		queries: q,
-		logger:  l,
-		mailer:  mailer.New(cfg),
+		config:      cfg,
+		db:          dbConn,
+		queries:     q,
+		logger:      l,
+		mailer:      mailer.New(cfg),
+		jobNotify:   make(chan struct{}, 1),
+		rateLimiter: NewJobRateLimiter(),
+		dlq:         NewDeadLetterQueue(q, dbConn, l),
 	}
 }
 
@@ -41,76 +49,152 @@ func (p *Processor) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			p.logger.Info("worker signal received: waiting for active jobs to finish")
+			p.logger.Info("worker stopping: waiting for active jobs to finish")
+			p.wg.Wait()
 			return
+		case <-p.jobNotify:
+			p.processNext(ctx)
 		case <-ticker.C:
 			p.processNext(ctx)
 		}
 	}
 }
 
-// Wait blocks until all active jobs are finished
+func (p *Processor) NotifyNewJob() {
+	select {
+	case p.jobNotify <- struct{}{}:
+	default:
+	}
+}
+
 func (p *Processor) Wait() {
 	p.wg.Wait()
 }
 
+func (p *Processor) GetDLQ() *DeadLetterQueue {
+	return p.dlq
+}
+
+func (p *Processor) GetRateLimiter() *JobRateLimiter {
+	return p.rateLimiter
+}
+
 func (p *Processor) processNext(ctx context.Context) {
+	job, err := p.queries.PickNextJob(ctx)
+	if err != nil {
+		return
+	}
+
 	p.wg.Add(1)
+	go p.processJob(ctx, job)
+}
+
+func (p *Processor) processJob(ctx context.Context, job db.Job) {
 	defer p.wg.Done()
 
 	start := time.Now()
-	job, err := p.queries.PickNextJob(ctx)
-	if err != nil {
-		return // Fila vazia
-	}
 
 	ctx, event := logging.NewEventContext(ctx)
 	event.Add(
 		slog.Int64("job_id", int64(job.ID)),
 		slog.String("job_type", string(job.Type)),
+		slog.Int64("attempt", job.AttemptCount),
 	)
 
-	// Idempotency Check: Verifica se o job já foi processado com sucesso anteriormente
 	processed, err := p.queries.IsJobProcessed(ctx, job.ID)
 	if err == nil && processed == 1 {
 		p.logger.InfoContext(ctx, "job already processed, skipping", event.Attrs()...)
-		_ = p.queries.CompleteJob(ctx, job.ID) // Garante que o status está sincronizado
+		_ = p.queries.CompleteJob(ctx, job.ID)
 		return
 	}
 
-	var errProcessing error
-	switch job.Type {
-	case "send_email":
-		errProcessing = p.handleSendEmail(ctx, job.Payload)
-	case "send_password_reset_email":
-		errProcessing = p.handleSendPasswordResetEmail(ctx, job.Payload)
-	case "send_verification_email":
-		errProcessing = p.handleSendVerificationEmail(ctx, job.Payload)
-	case "process_ai":
-		errProcessing = p.handleProcessAI(ctx, job.Payload)
-	case "process_webhook":
-		errProcessing = p.handleProcessWebhook(ctx, job.Payload)
-	default:
-		p.logger.WarnContext(ctx, "unknown job type", "type", job.Type)
+	if err := p.rateLimiter.Acquire(ctx, string(job.Type)); err != nil {
+		p.logger.WarnContext(ctx, "rate limit wait cancelled", "error", err.Error())
+		return
+	}
+	defer p.rateLimiter.Release(string(job.Type))
+
+	errProcessing := p.handleJob(ctx, job)
+
+	if retryAfter := GetRetryAfterDuration(errProcessing); retryAfter > 0 && IsExternalRateLimitError(errProcessing) {
+		p.logger.WarnContext(ctx, "external rate limit detected, backing off",
+			"retry_after", retryAfter.String(),
+			"error", errProcessing.Error(),
+		)
+		time.Sleep(retryAfter)
+		errProcessing = nil
 	}
 
 	if errProcessing != nil {
-		if err := p.queries.FailJob(ctx, db.FailJobParams{
-			LastError: sql.NullString{String: errProcessing.Error(), Valid: true},
-			ID:        job.ID,
-		}); err != nil {
-			p.logger.ErrorContext(ctx, "failed to record job failure in db", "error", err)
-		}
-		metrics.JobDuration.WithLabelValues(string(job.Type), "failed").Observe(time.Since(start).Seconds())
-		p.logger.ErrorContext(ctx, "job processing failed",
-			append(event.Attrs(), slog.String("error", errProcessing.Error()))...)
+		p.handleFailure(ctx, job, errProcessing, start, event)
 		return
 	}
 
-	// Sucesso: Registrar que foi processado e completar o job em uma transação
+	p.handleSuccess(ctx, job, start, event)
+
+	if job.TenantID.Valid {
+		var userID int64
+		if _, err := fmt.Sscanf(job.TenantID.String, "%d", &userID); err == nil && userID > 0 {
+			web.BroadcastToUser(userID, "job_completed", string(job.Type))
+			return
+		}
+	}
+
+	web.Broadcast("job_completed", string(job.Type))
+}
+
+func (p *Processor) handleJob(ctx context.Context, job db.Job) error {
+	switch job.Type {
+	case "send_email":
+		return p.handleSendEmail(ctx, job.Payload)
+	case "send_password_reset_email":
+		return p.handleSendPasswordResetEmail(ctx, job.Payload)
+	case "send_verification_email":
+		return p.handleSendVerificationEmail(ctx, job.Payload)
+	case "process_ai":
+		return p.handleProcessAI(ctx, job.Payload)
+	case "process_webhook":
+		return p.handleProcessWebhook(ctx, job.Payload)
+	default:
+		p.logger.WarnContext(ctx, "unknown job type", "type", job.Type)
+		return fmt.Errorf("unknown job type: %s", job.Type)
+	}
+}
+
+func (p *Processor) handleFailure(ctx context.Context, job db.Job, errProcessing error, start time.Time, event *logging.Event) {
+	metrics.JobDuration.WithLabelValues(string(job.Type), "failed").Observe(time.Since(start).Seconds())
+
+	if p.dlq.ShouldMoveToDLQ(job) {
+		if err := p.dlq.Move(ctx, job, errProcessing); err != nil {
+			p.logger.ErrorContext(ctx, "failed to move job to DLQ", "error", err.Error())
+		}
+		return
+	}
+
+	if err := p.queries.FailJob(ctx, db.FailJobParams{
+		LastError: sql.NullString{String: errProcessing.Error(), Valid: true},
+		ID:        job.ID,
+	}); err != nil {
+		p.logger.ErrorContext(ctx, "failed to record job failure in db", "error", err.Error())
+	}
+
+	if IsRetryableError(errProcessing) {
+		backoff := FullJitter(int(job.AttemptCount), DefaultBackoffConfig)
+		p.logger.InfoContext(ctx, "retryable error, will retry",
+			"backoff", backoff.String(),
+			"error", errProcessing.Error(),
+		)
+		metrics.JobRetries.WithLabelValues(string(job.Type)).Inc()
+	}
+
+	p.logger.ErrorContext(ctx, "job processing failed",
+		append(event.Attrs(), slog.String("error", errProcessing.Error()))...)
+}
+
+func (p *Processor) handleSuccess(ctx context.Context, job db.Job, start time.Time, event *logging.Event) {
 	tx, err := p.db.BeginTx(ctx, nil)
 	if err != nil {
-		p.logger.ErrorContext(ctx, "failed to start transaction", "error", err)
+		p.logger.ErrorContext(ctx, "failed to start transaction", "error", err.Error())
 		return
 	}
 	defer func() { _ = tx.Rollback() }()
@@ -118,17 +202,17 @@ func (p *Processor) processNext(ctx context.Context) {
 	qtx := p.queries.WithTx(tx)
 
 	if err := qtx.RecordJobProcessed(ctx, job.ID); err != nil {
-		p.logger.ErrorContext(ctx, "failed to record job processed", "error", err)
+		p.logger.ErrorContext(ctx, "failed to record job processed", "error", err.Error())
 		return
 	}
 
 	if err := qtx.CompleteJob(ctx, job.ID); err != nil {
-		p.logger.ErrorContext(ctx, "failed to complete job", "error", err)
+		p.logger.ErrorContext(ctx, "failed to complete job", "error", err.Error())
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		p.logger.ErrorContext(ctx, "failed to commit transaction", "error", err)
+		p.logger.ErrorContext(ctx, "failed to commit transaction", "error", err.Error())
 		return
 	}
 
@@ -137,20 +221,6 @@ func (p *Processor) processNext(ctx context.Context) {
 	event.Add(slog.Float64("duration_ms", float64(duration.Nanoseconds())/1e6))
 
 	p.logger.InfoContext(ctx, "job completed", event.Attrs()...)
-
-	// Notificação em tempo real via SSE
-	if job.TenantID.Valid {
-		// Tenta converter tenant_id para userID se for um número
-		var userID int64
-		if _, err := fmt.Sscanf(job.TenantID.String, "%d", &userID); err != nil {
-			p.logger.DebugContext(ctx, "tenant_id is not a numeric userID, skipping broadcast", "tenant_id", job.TenantID.String)
-		} else if userID > 0 {
-			web.BroadcastToUser(userID, "job_completed", string(job.Type))
-			return
-		}
-	}
-
-	web.Broadcast("job_completed", string(job.Type))
 }
 
 func (p *Processor) handleSendEmail(ctx context.Context, payload json.RawMessage) error {
@@ -177,9 +247,9 @@ func (p *Processor) handleSendVerificationEmail(ctx context.Context, payload jso
 		return err
 	}
 
+	verifyURL := p.config.BaseURL + "/verify-email?token=" + data.Token
 	subject := "Verifique seu E-mail"
-	body := "Olá,\n\nBem-vindo! Clique no link abaixo para verificar seu e-mail:\n\n" +
-		"http://localhost:8080/verify-email?token=" + data.Token
+	body := "Olá,\n\nBem-vindo! Clique no link abaixo para verificar seu e-mail:\n\n" + verifyURL
 
 	return p.mailer.Send(data.Email, subject, body)
 }
@@ -194,10 +264,10 @@ func (p *Processor) handleSendPasswordResetEmail(ctx context.Context, payload js
 		return err
 	}
 
+	resetURL := p.config.BaseURL + "/reset-password?token=" + data.Token
 	subject := "Recuperação de Senha"
 	body := "Olá,\n\nClique no link abaixo para redefinir sua senha:\n\n" +
-		"http://localhost:8080/reset-password?token=" + data.Token + "\n\n" +
-		"Este link expira em 1 hora."
+		resetURL + "\n\nEste link expira em 1 hora."
 
 	return p.mailer.Send(data.Email, subject, body)
 }
@@ -211,8 +281,7 @@ func (p *Processor) handleProcessAI(ctx context.Context, payload json.RawMessage
 		return err
 	}
 
-	p.logger.InfoContext(ctx, "AI processing started", slog.String("prompt", data.Prompt))
-	// Simular integração com OpenAI/Anthropic
+	p.logger.InfoContext(ctx, "AI processing started", "prompt", data.Prompt)
 	time.Sleep(2 * time.Second)
 
 	return nil
@@ -227,8 +296,7 @@ func (p *Processor) handleProcessWebhook(ctx context.Context, payload json.RawMe
 		return err
 	}
 
-	p.logger.InfoContext(ctx, "processing webhook event", slog.Int64("webhook_id", data.WebhookID))
+	p.logger.InfoContext(ctx, "processing webhook event", "webhook_id", data.WebhookID)
 
-	// Aqui você buscaria o payload bruto no banco se necessário
 	return nil
 }

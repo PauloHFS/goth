@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/PauloHFS/goth/internal/contextkeys"
 	"github.com/PauloHFS/goth/internal/db"
@@ -16,7 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func setupTestDB(b *testing.B) (*sql.DB, *db.Queries) {
+func setupPerfDB(b *testing.B) (*sql.DB, *db.Queries) {
 	// Usamos um arquivo temporário para simular performance real de disco (SSD)
 	// Em vez de :memory:, para testar o modo WAL de verdade
 	dbFile := fmt.Sprintf("test_perf_%d.db", b.N)
@@ -31,7 +32,7 @@ func setupTestDB(b *testing.B) (*sql.DB, *db.Queries) {
 	queries := db.New(dbConn)
 
 	// Inserir 100 usuários para o teste de paginação
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		_, _ = queries.CreateUser(context.Background(), db.CreateUserParams{
 			TenantID:     "default",
 			Email:        fmt.Sprintf("user%d@test.com", i),
@@ -51,7 +52,7 @@ func setupTestDB(b *testing.B) (*sql.DB, *db.Queries) {
 }
 
 func BenchmarkDashboardRendering(b *testing.B) {
-	_, queries := setupTestDB(b)
+	_, queries := setupPerfDB(b)
 	user := db.User{ID: 1, Email: "admin@test.com"}
 	ctx := context.WithValue(context.Background(), contextkeys.UserContextKey, user)
 
@@ -79,53 +80,55 @@ func BenchmarkDashboardRendering(b *testing.B) {
 }
 
 func BenchmarkConcurrentWebhookIngestion(b *testing.B) {
-	dbConn, queries := setupTestDB(b)
+	dbConn, _ := setupPerfDB(b)
 
 	// Criar tabelas com definições completas para evitar erros de SCAN
+	// Nota: Não usamos sqlc aqui porque as tabelas são temporárias
 	_, _ = dbConn.Exec(`CREATE TABLE webhooks (
-		id INTEGER PRIMARY KEY AUTOINCREMENT, 
-		source TEXT NOT NULL, 
-		external_id TEXT, 
-		payload JSON NOT NULL, 
-		headers JSON NOT NULL, 
-		status TEXT NOT NULL DEFAULT 'pending', 
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		source TEXT NOT NULL,
+		external_id TEXT,
+		payload JSON NOT NULL,
+		headers JSON NOT NULL,
+		status TEXT NOT NULL DEFAULT 'pending',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 	_, _ = dbConn.Exec(`CREATE TABLE jobs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT, 
-		tenant_id TEXT, 
-		type TEXT NOT NULL, 
-		payload JSON NOT NULL, 
-		status TEXT NOT NULL DEFAULT 'pending', 
-		idempotency_key TEXT, 
-		attempt_count INTEGER DEFAULT 0, 
-		max_attempts INTEGER DEFAULT 3, 
-		last_error TEXT, 
-		run_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		tenant_id TEXT,
+		type TEXT NOT NULL,
+		payload JSON NOT NULL,
+		status TEXT NOT NULL DEFAULT 'pending',
+		idempotency_key TEXT,
+		attempt_count INTEGER DEFAULT 0,
+		max_attempts INTEGER DEFAULT 3,
+		last_error TEXT,
+		run_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			ctx := context.Background()
 			// Simular o GOTH Ingestion flow: Persistir Webhook + Criar Job
-			_, err := queries.CreateWebhook(ctx, db.CreateWebhookParams{
-				Source:     "stripe",
-				ExternalID: sql.NullString{String: "evt_test", Valid: true},
-				Payload:    []byte(`{"id": "evt_test"}`),
-				Headers:    []byte(`{}`),
-			})
+			// Usamos SQL direto porque as tabelas são temporárias
+			_, err := dbConn.Exec(`INSERT INTO webhooks (source, external_id, payload, headers) VALUES (?, ?, ?, ?)`,
+				"stripe",
+				"evt_test",
+				[]byte(`{"id": "evt_test"}`),
+				[]byte(`{}`),
+			)
 			if err != nil {
 				b.Error(err)
 			}
 
-			_, err = queries.CreateJob(ctx, db.CreateJobParams{
-				TenantID: sql.NullString{String: "1", Valid: true},
-				Type:     "process_webhook",
-				Payload:  []byte(`{"webhook_id": 1}`),
-			})
+			_, err = dbConn.Exec(`INSERT INTO jobs (tenant_id, type, payload, run_at) VALUES (?, ?, ?, ?)`,
+				"1",
+				"process_webhook",
+				[]byte(`{"webhook_id": 1}`),
+				time.Now(),
+			)
 			if err != nil {
 				b.Error(err)
 			}
@@ -133,25 +136,22 @@ func BenchmarkConcurrentWebhookIngestion(b *testing.B) {
 	})
 }
 
-func BenchmarkFTS5Search(b *testing.B) {
-	dbConn, _ := setupTestDB(b)
+func BenchmarkFTS5SearchPerf(b *testing.B) {
+	dbConn, _ := setupPerfDB(b)
 
 	// Setup FTS5 schema e dados
-	_, _ = dbConn.Exec(`CREATE TABLE posts (id INTEGER PRIMARY KEY, tenant_id TEXT, user_id INTEGER, title TEXT, content TEXT)`)
-	_, _ = dbConn.Exec(`CREATE VIRTUAL TABLE posts_idx USING fts5(title, content, content='posts', content_rowid='id')`)
+	_, _ = dbConn.Exec(`CREATE VIRTUAL TABLE users_fts USING fts5(email, content='users', content_rowid='id')`)
 
-	// Inserir 1000 posts para um volume de busca razoável
-	for i := 0; i < 1000; i++ {
-		_, _ = dbConn.Exec(`INSERT INTO posts (tenant_id, user_id, title, content) VALUES ('default', 1, ?, ?)`,
-			fmt.Sprintf("Post Title %d", i),
-			fmt.Sprintf("This is the content of post %d. It contains some keywords like GOTH and SQLite.", i))
-		_, _ = dbConn.Exec(`INSERT INTO posts_idx (rowid, title, content) VALUES (?, ?, ?)`,
-			i+1, fmt.Sprintf("Post Title %d", i), fmt.Sprintf("This is the content of post %d. It contains some keywords like GOTH and SQLite.", i))
+	// Inserir 1000 users para um volume de busca razoável
+	for i := range 1000 {
+		_, _ = dbConn.Exec(`INSERT INTO users_fts(rowid, email) VALUES (?, ?)`,
+			i+1,
+			fmt.Sprintf("user%d@domain.com", i))
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rows, err := dbConn.Query(`SELECT title FROM posts_idx WHERE posts_idx MATCH 'GOTH AND SQLite' LIMIT 20`)
+		rows, err := dbConn.Query(`SELECT email FROM users_fts WHERE users_fts MATCH 'user*' LIMIT 20`)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -159,7 +159,7 @@ func BenchmarkFTS5Search(b *testing.B) {
 	}
 }
 
-func BenchmarkPasswordHashing(b *testing.B) {
+func BenchmarkPasswordHashingPerf(b *testing.B) {
 	password := "super-secret-password-123"
 
 	b.Run("Bcrypt-Default", func(b *testing.B) {
@@ -170,7 +170,7 @@ func BenchmarkPasswordHashing(b *testing.B) {
 }
 
 func BenchmarkSQLiteReadWriteStress(b *testing.B) {
-	dbConn, queries := setupTestDB(b)
+	dbConn, queries := setupPerfDB(b)
 
 	// Setup adicional para simular carga real
 	_, _ = dbConn.Exec(`CREATE TABLE webhooks (id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT, external_id TEXT, payload JSON, headers JSON, status TEXT, created_at DATETIME)`)

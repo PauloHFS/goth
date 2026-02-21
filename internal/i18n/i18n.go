@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"context"
+
 	"github.com/PauloHFS/goth/internal/contextkeys"
 )
 

@@ -2,6 +2,7 @@ package view
 
 import (
 	"context"
+
 	"github.com/PauloHFS/goth/internal/contextkeys"
 )
 

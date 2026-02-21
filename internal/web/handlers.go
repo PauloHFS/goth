@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PauloHFS/goth/internal/config"
@@ -21,6 +22,7 @@ import (
 	"github.com/PauloHFS/goth/internal/logging"
 	"github.com/PauloHFS/goth/internal/middleware"
 	"github.com/PauloHFS/goth/internal/routes"
+	"github.com/PauloHFS/goth/internal/validator"
 	"github.com/PauloHFS/goth/internal/view"
 	"github.com/PauloHFS/goth/internal/view/pages"
 	"github.com/a-h/templ"
@@ -32,7 +34,6 @@ type HandlerDeps struct {
 	DB             *sql.DB
 	Queries        *db.Queries
 	SessionManager *scs.SessionManager
-	Logger         *slog.Logger
 	Config         *config.Config
 }
 
@@ -43,14 +44,12 @@ type AppHandler func(deps HandlerDeps, w http.ResponseWriter, r *http.Request) e
 func Handle(deps HandlerDeps, h AppHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := h(deps, w, r); err != nil {
-			// Aqui centralizamos o log de erro estruturado
-			deps.Logger.Error("request failed",
+			logging.Get().Error("request failed",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Any("error", err),
 			)
 
-			// Decidir o que mostrar ao usuário
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}
@@ -77,6 +76,7 @@ func RegisterRoutes(mux *http.ServeMux, deps HandlerDeps) {
 
 	// Protected Routes
 	mux.Handle("GET "+routes.Dashboard, middleware.RequireAuth(deps.SessionManager, deps.Queries, Handle(deps, handleDashboard)))
+	mux.Handle("GET "+routes.Admin, middleware.RequireAuth(deps.SessionManager, deps.Queries, Handle(deps, handleAdmin)))
 	mux.Handle("POST /profile/avatar", middleware.RequireAuth(deps.SessionManager, deps.Queries, Handle(deps, handleAvatarUpload)))
 
 	// Public Routes
@@ -92,11 +92,35 @@ func handleRegister(deps HandlerDeps, w http.ResponseWriter, r *http.Request) er
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
+	emailDomain := ""
+	if idx := strings.Index(email, "@"); idx > 0 {
+		emailDomain = email[idx+1:]
+	}
+
+	logging.AddToEvent(r.Context(),
+		slog.String("operation", "register"),
+		slog.String("email_domain", emailDomain),
+	)
+
+	validation := validator.ValidateRegistration(email, password)
+	if !validation.Valid {
+		errorMsg := ""
+		for _, err := range validation.Errors {
+			errorMsg += err.Message + " "
+		}
+		templ.Handler(pages.Register(strings.TrimSpace(errorMsg))).ServeHTTP(w, r)
+		return nil
+	}
+
 	_, err := deps.Queries.GetUserByEmail(r.Context(), db.GetUserByEmailParams{
 		TenantID: "default",
 		Email:    email,
 	})
 	if err == nil {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "email_already_exists"),
+		)
 		templ.Handler(pages.Register("Este e-mail já está em uso")).ServeHTTP(w, r)
 		return nil
 	}
@@ -114,7 +138,7 @@ func handleRegister(deps HandlerDeps, w http.ResponseWriter, r *http.Request) er
 
 	qtx := deps.Queries.WithTx(tx)
 
-	_, err = qtx.CreateUser(r.Context(), db.CreateUserParams{
+	user, err := qtx.CreateUser(r.Context(), db.CreateUserParams{
 		TenantID:     "default",
 		Email:        email,
 		PasswordHash: string(hash),
@@ -123,6 +147,10 @@ func handleRegister(deps HandlerDeps, w http.ResponseWriter, r *http.Request) er
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
+
+	logging.AddToEvent(r.Context(),
+		slog.Int64("created_user_id", user.ID),
+	)
 
 	tokenBytes := make([]byte, 32)
 	if _, err := crypto_rand.Read(tokenBytes); err != nil {
@@ -159,12 +187,22 @@ func handleRegister(deps HandlerDeps, w http.ResponseWriter, r *http.Request) er
 		return fmt.Errorf("failed to commit registration: %w", err)
 	}
 
+	logging.AddToEvent(r.Context(),
+		slog.String("outcome", "success"),
+	)
+
 	http.Redirect(w, r, routes.Login+"?message=Conta criada! Verifique seu e-mail.", http.StatusSeeOther)
 	return nil
 }
 
 func handleForgotPassword(deps HandlerDeps, w http.ResponseWriter, r *http.Request) error {
 	email := r.FormValue("email")
+
+	if err := validator.ValidateEmail(email); err != nil {
+		templ.Handler(pages.ForgotPassword(err.Error())).ServeHTTP(w, r)
+		return nil
+	}
+
 	_, err := deps.Queries.GetUserByEmail(r.Context(), db.GetUserByEmailParams{
 		TenantID: "default",
 		Email:    email,
@@ -226,6 +264,11 @@ func handleResetPassword(deps HandlerDeps, w http.ResponseWriter, r *http.Reques
 	token := r.FormValue("token")
 	password := r.FormValue("password")
 
+	if err := validator.ValidatePassword(password); err != nil {
+		templ.Handler(pages.ResetPassword(token, err.Error())).ServeHTTP(w, r)
+		return nil
+	}
+
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])
 
@@ -257,7 +300,7 @@ func handleResetPassword(deps HandlerDeps, w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := qtx.DeletePasswordReset(r.Context(), reset.Email); err != nil {
-		deps.Logger.Warn("failed to delete password reset token", "error", err)
+		logging.Get().Warn("failed to delete password reset token", "error", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -295,7 +338,7 @@ func handleVerifyEmail(deps HandlerDeps, w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := qtx.DeleteEmailVerification(r.Context(), verification.Email); err != nil {
-		deps.Logger.Warn("failed to delete email verification token", "error", err)
+		logging.Get().Warn("failed to delete email verification token", "error", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -310,20 +353,54 @@ func handleLogin(deps HandlerDeps, w http.ResponseWriter, r *http.Request) error
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
+	emailDomain := ""
+	if idx := strings.Index(email, "@"); idx > 0 {
+		emailDomain = email[idx+1:]
+	}
+
+	logging.AddToEvent(r.Context(),
+		slog.String("operation", "login"),
+		slog.String("email_domain", emailDomain),
+	)
+
+	if email == "" || password == "" {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "missing_credentials"),
+		)
+		templ.Handler(pages.Login("Email e senha são obrigatórios")).ServeHTTP(w, r)
+		return nil
+	}
+
 	user, err := deps.Queries.GetUserByEmail(r.Context(), db.GetUserByEmailParams{
 		TenantID: "default",
 		Email:    email,
 	})
 
 	if err != nil {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "user_not_found"),
+		)
 		templ.Handler(pages.Login("Usuário ou senha inválidos")).ServeHTTP(w, r)
 		return nil
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "invalid_password"),
+			slog.Int64("user_id", user.ID),
+		)
 		templ.Handler(pages.Login("Usuário ou senha inválidos")).ServeHTTP(w, r)
 		return nil
 	}
+
+	logging.AddToEvent(r.Context(),
+		slog.String("outcome", "success"),
+		slog.Int64("user_id", user.ID),
+		slog.String("user_role", user.RoleID),
+	)
 
 	deps.SessionManager.Put(r.Context(), "user_id", user.ID)
 	http.Redirect(w, r, routes.Dashboard, http.StatusSeeOther)
@@ -384,23 +461,55 @@ func handleAvatarUpload(deps HandlerDeps, w http.ResponseWriter, r *http.Request
 		return nil
 	}
 
+	logging.AddToEvent(r.Context(),
+		slog.String("operation", "avatar_upload"),
+		slog.Int64("user_id", user.ID),
+	)
+
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "parse_form_failed"),
+		)
 		return fmt.Errorf("failed to parse multipart form: %w", err)
 	}
 
 	file, header, err := r.FormFile("avatar")
 	if err != nil {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "no_file_provided"),
+		)
 		http.Error(w, "invalid file", http.StatusBadRequest)
 		return nil
 	}
 	defer file.Close()
 
-	ext := filepath.Ext(header.Filename)
-	filename := fmt.Sprintf("%d%s", user.ID, ext)
+	if err := validator.ValidateUpload(header.Filename, header.Header.Get("Content-Type"), 2<<20); err != nil {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "validation_failed"),
+			slog.String("filename", header.Filename),
+		)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil
+	}
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	filename := fmt.Sprintf("%d_%d%s", user.ID, time.Now().Unix(), ext)
 	dstPath := filepath.Join("storage", "avatars", filename)
+
+	logging.AddToEvent(r.Context(),
+		slog.String("file_extension", ext),
+		slog.Int64("file_size", header.Size),
+	)
 
 	dst, err := os.Create(dstPath)
 	if err != nil {
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "error"),
+			slog.String("error_reason", "file_creation_failed"),
+		)
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer dst.Close()
@@ -414,7 +523,7 @@ func handleAvatarUpload(deps HandlerDeps, w http.ResponseWriter, r *http.Request
 		AvatarUrl: sql.NullString{String: avatarURL, Valid: true},
 		ID:        user.ID,
 	}); err != nil {
-		deps.Logger.Warn("failed to update avatar in database", "error", err)
+		logging.Get().Warn("failed to update avatar in database", "error", err)
 	}
 
 	jobPayload, _ := json.Marshal(map[string]string{"image": avatarURL})
@@ -424,9 +533,56 @@ func handleAvatarUpload(deps HandlerDeps, w http.ResponseWriter, r *http.Request
 		Payload:  jobPayload,
 		RunAt:    sql.NullTime{Time: time.Now(), Valid: true},
 	}); err != nil {
-		deps.Logger.Warn("failed to create AI processing job", "error", err)
+		logging.AddToEvent(r.Context(),
+			slog.String("outcome", "partial_success"),
+			slog.String("error_reason", "job_creation_failed"),
+		)
 	}
 
+	logging.AddToEvent(r.Context(),
+		slog.String("outcome", "success"),
+		slog.String("avatar_url", avatarURL),
+	)
+
 	http.Redirect(w, r, routes.Dashboard, http.StatusSeeOther)
+	return nil
+}
+
+func handleAdmin(deps HandlerDeps, w http.ResponseWriter, r *http.Request) error {
+	user, _ := r.Context().Value(contextkeys.UserContextKey).(db.User)
+
+	if user.RoleID != "admin" {
+		http.Redirect(w, r, routes.Dashboard, http.StatusForbidden)
+		return nil
+	}
+
+	totalUsers, _ := deps.Queries.CountUsers(r.Context(), "default")
+
+	var totalDeadLetters int64
+	if deps.Queries != nil {
+		count, err := deps.Queries.CountDeadLetterJobs(r.Context())
+		if err == nil {
+			totalDeadLetters = count
+		}
+	}
+
+	stats := pages.AdminStats{
+		TotalUsers:       totalUsers,
+		TotalDeadLetters: totalDeadLetters,
+		ActiveJobs:       0,
+		FailedJobs:       0,
+		RateLimits: map[string]pages.RateLimitStatus{
+			"default": {RequestsPerSecond: 10, Burst: 20, CurrentCount: 0},
+			"auth":    {RequestsPerSecond: 5, Burst: 10, CurrentCount: 0},
+			"api":     {RequestsPerSecond: 20, Burst: 40, CurrentCount: 0},
+			"webhook": {RequestsPerSecond: 100, Burst: 200, CurrentCount: 0},
+			"upload":  {RequestsPerSecond: 2, Burst: 5, CurrentCount: 0},
+		},
+		EmailProviders: []pages.EmailProviderStatus{
+			{Name: "SMTP", Type: "smtp", Enabled: true, LastUsed: "N/A"},
+		},
+	}
+
+	templ.Handler(pages.Admin(user, stats)).ServeHTTP(w, r)
 	return nil
 }

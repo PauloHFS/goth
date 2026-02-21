@@ -11,4 +11,5 @@ const (
 	Dashboard      = "/dashboard"
 	Health         = "/health"
 	Metrics        = "/metrics"
+	Admin          = "/admin"
 )

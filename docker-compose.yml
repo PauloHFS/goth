@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - APP_ENV=dev
+      - DATABASE_URL=/data/goth.db
+      - SESSION_SECRET=dev-secret-change-in-prod
+      - BASE_URL=http://localhost:8080
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+    volumes:
+      - goth_data:/data
+      - ./storage:/app/storage
+    depends_on:
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      - MP_SMTP_AUTH_ACCEPT_ANY=1
+      - MP_SMTP_AUTH_ALLOW_INSECURE=1
+
+volumes:
+  goth_data:

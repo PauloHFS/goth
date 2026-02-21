@@ -10,7 +10,65 @@ import (
 	"time"
 )
 
+type ActivityLog struct {
+	ID         int64           `json:"id"`
+	TenantID   sql.NullString  `json:"tenant_id"`
+	UserID     sql.NullInt64   `json:"user_id"`
+	Action     string          `json:"action"`
+	EntityType sql.NullString  `json:"entity_type"`
+	EntityID   sql.NullString  `json:"entity_id"`
+	Metadata   json.RawMessage `json:"metadata"`
+	IpAddress  sql.NullString  `json:"ip_address"`
+	UserAgent  sql.NullString  `json:"user_agent"`
+	CreatedAt  sql.NullTime    `json:"created_at"`
+}
+
+type ActivityLogsFt struct {
+	Action     string `json:"action"`
+	EntityType string `json:"entity_type"`
+}
+
+type AdminUser struct {
+	ID          int64           `json:"id"`
+	UserID      int64           `json:"user_id"`
+	Role        string          `json:"role"`
+	Permissions json.RawMessage `json:"permissions"`
+	CreatedAt   sql.NullTime    `json:"created_at"`
+}
+
+type DeadLetterJob struct {
+	ID            int64           `json:"id"`
+	OriginalJobID int64           `json:"original_job_id"`
+	TenantID      sql.NullString  `json:"tenant_id"`
+	Type          string          `json:"type"`
+	Payload       json.RawMessage `json:"payload"`
+	AttemptCount  int64           `json:"attempt_count"`
+	LastError     sql.NullString  `json:"last_error"`
+	FailedAt      sql.NullTime    `json:"failed_at"`
+	CreatedAt     sql.NullTime    `json:"created_at"`
+	ArchivedAt    sql.NullTime    `json:"archived_at"`
+}
+
+type EmailProvider struct {
+	ID               int64           `json:"id"`
+	TenantID         string          `json:"tenant_id"`
+	Provider         string          `json:"provider"`
+	ApiKeyEncrypted  string          `json:"api_key_encrypted"`
+	Config           json.RawMessage `json:"config"`
+	IsActive         sql.NullBool    `json:"is_active"`
+	IsPrimary        sql.NullBool    `json:"is_primary"`
+	DailyLimit       sql.NullInt64   `json:"daily_limit"`
+	MonthlyLimit     sql.NullInt64   `json:"monthly_limit"`
+	EmailsSentToday  sql.NullInt64   `json:"emails_sent_today"`
+	EmailsSentMonth  sql.NullInt64   `json:"emails_sent_month"`
+	LastResetDaily   sql.NullTime    `json:"last_reset_daily"`
+	LastResetMonthly sql.NullTime    `json:"last_reset_monthly"`
+	CreatedAt        sql.NullTime    `json:"created_at"`
+	UpdatedAt        sql.NullTime    `json:"updated_at"`
+}
+
 type EmailVerification struct {
+	ID        int64        `json:"id"`
 	Email     string       `json:"email"`
 	Token     string       `json:"token"`
 	ExpiresAt time.Time    `json:"expires_at"`
@@ -24,42 +82,36 @@ type Job struct {
 	Payload        json.RawMessage `json:"payload"`
 	Status         string          `json:"status"`
 	IdempotencyKey sql.NullString  `json:"idempotency_key"`
-	AttemptCount   sql.NullInt64   `json:"attempt_count"`
-	MaxAttempts    sql.NullInt64   `json:"max_attempts"`
+	AttemptCount   int64           `json:"attempt_count"`
+	MaxAttempts    int64           `json:"max_attempts"`
 	LastError      sql.NullString  `json:"last_error"`
 	RunAt          sql.NullTime    `json:"run_at"`
+	StartedAt      sql.NullTime    `json:"started_at"`
+	CompletedAt    sql.NullTime    `json:"completed_at"`
 	CreatedAt      sql.NullTime    `json:"created_at"`
 	UpdatedAt      sql.NullTime    `json:"updated_at"`
 }
 
 type PasswordReset struct {
+	ID        int64        `json:"id"`
 	Email     string       `json:"email"`
 	TokenHash string       `json:"token_hash"`
 	ExpiresAt time.Time    `json:"expires_at"`
+	UsedAt    sql.NullTime `json:"used_at"`
 	CreatedAt sql.NullTime `json:"created_at"`
 }
 
-type Post struct {
-	ID       int64  `json:"id"`
-	TenantID string `json:"tenant_id"`
-	UserID   int64  `json:"user_id"`
-	Title    string `json:"title"`
-	Content  string `json:"content"`
-}
-
-type PostsIdx struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
-
 type ProcessedJob struct {
+	ID          int64     `json:"id"`
 	JobID       int64     `json:"job_id"`
 	ProcessedAt time.Time `json:"processed_at"`
 }
 
 type Role struct {
-	ID          string          `json:"id"`
-	Permissions json.RawMessage `json:"permissions"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Permissions sql.NullString `json:"permissions"`
+	CreatedAt   sql.NullTime   `json:"created_at"`
 }
 
 type Session struct {
@@ -68,11 +120,23 @@ type Session struct {
 	Expiry float64 `json:"expiry"`
 }
 
+type SystemConfig struct {
+	Key         string          `json:"key"`
+	Value       json.RawMessage `json:"value"`
+	Description sql.NullString  `json:"description"`
+	UpdatedAt   sql.NullTime    `json:"updated_at"`
+}
+
 type Tenant struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Settings  json.RawMessage `json:"settings"`
-	CreatedAt sql.NullTime    `json:"created_at"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Settings  sql.NullString `json:"settings"`
+	CreatedAt sql.NullTime   `json:"created_at"`
+	UpdatedAt sql.NullTime   `json:"updated_at"`
+}
+
+type TenantsFt struct {
+	Name string `json:"name"`
 }
 
 type User struct {
@@ -82,16 +146,25 @@ type User struct {
 	PasswordHash string         `json:"password_hash"`
 	RoleID       string         `json:"role_id"`
 	IsVerified   bool           `json:"is_verified"`
+	IsActive     bool           `json:"is_active"`
 	AvatarUrl    sql.NullString `json:"avatar_url"`
+	LastLoginAt  sql.NullTime   `json:"last_login_at"`
 	CreatedAt    sql.NullTime   `json:"created_at"`
+	UpdatedAt    sql.NullTime   `json:"updated_at"`
+}
+
+type UsersFt struct {
+	Email string `json:"email"`
 }
 
 type Webhook struct {
-	ID         int64           `json:"id"`
-	Source     string          `json:"source"`
-	ExternalID sql.NullString  `json:"external_id"`
-	Payload    json.RawMessage `json:"payload"`
-	Headers    json.RawMessage `json:"headers"`
-	Status     string          `json:"status"`
-	CreatedAt  sql.NullTime    `json:"created_at"`
+	ID           int64           `json:"id"`
+	Source       string          `json:"source"`
+	ExternalID   sql.NullString  `json:"external_id"`
+	Payload      json.RawMessage `json:"payload"`
+	Headers      json.RawMessage `json:"headers"`
+	Status       string          `json:"status"`
+	ProcessedAt  sql.NullTime    `json:"processed_at"`
+	ErrorMessage sql.NullString  `json:"error_message"`
+	CreatedAt    sql.NullTime    `json:"created_at"`
 }

@@ -13,6 +13,7 @@ const (
 	Dashboard      = "/dashboard"
 	Health         = "/health"
 	Metrics        = "/metrics"
+	Admin          = "/admin"
 )
 
 // WebhookRoute generates the path for a webhook source

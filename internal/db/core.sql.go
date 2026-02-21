@@ -12,6 +12,25 @@ import (
 	"time"
 )
 
+const cancelJob = `-- name: CancelJob :exec
+UPDATE jobs SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'
+`
+
+func (q *Queries) CancelJob(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, cancelJob, id)
+	return err
+}
+
+const cleanupDeadLetterJobs = `-- name: CleanupDeadLetterJobs :exec
+DELETE FROM dead_letter_jobs 
+WHERE failed_at < datetime('now', '-14 days')
+`
+
+func (q *Queries) CleanupDeadLetterJobs(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, cleanupDeadLetterJobs)
+	return err
+}
+
 const completeJob = `-- name: CompleteJob :exec
 UPDATE jobs 
 SET status = 'completed', updated_at = CURRENT_TIMESTAMP 
@@ -21,6 +40,44 @@ WHERE id = ?
 func (q *Queries) CompleteJob(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, completeJob, id)
 	return err
+}
+
+const countDeadLetterJobs = `-- name: CountDeadLetterJobs :one
+SELECT COUNT(*) FROM dead_letter_jobs
+`
+
+func (q *Queries) CountDeadLetterJobs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countDeadLetterJobs)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countDeadLetterJobsByType = `-- name: CountDeadLetterJobsByType :one
+SELECT COUNT(*) FROM dead_letter_jobs WHERE type = ?
+`
+
+func (q *Queries) CountDeadLetterJobsByType(ctx context.Context, type_ string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countDeadLetterJobsByType, type_)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countJobs = `-- name: CountJobs :one
+SELECT COUNT(*) FROM jobs WHERE (? = '' OR status = ?)
+`
+
+type CountJobsParams struct {
+	Column1 interface{} `json:"column_1"`
+	Status  string      `json:"status"`
+}
+
+func (q *Queries) CountJobs(ctx context.Context, arg CountJobsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countJobs, arg.Column1, arg.Status)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const countUsers = `-- name: CountUsers :one
@@ -35,7 +92,7 @@ func (q *Queries) CountUsers(ctx context.Context, tenantID string) (int64, error
 }
 
 const createJob = `-- name: CreateJob :one
-INSERT INTO jobs (tenant_id, type, payload, run_at) VALUES (?, ?, ?, ?) RETURNING id, tenant_id, type, payload, status, idempotency_key, attempt_count, max_attempts, last_error, run_at, created_at, updated_at
+INSERT INTO jobs (tenant_id, type, payload, run_at) VALUES (?, ?, ?, ?) RETURNING id, tenant_id, type, payload, status, idempotency_key, attempt_count, max_attempts, last_error, run_at, started_at, completed_at, created_at, updated_at
 `
 
 type CreateJobParams struct {
@@ -64,6 +121,8 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		&i.MaxAttempts,
 		&i.LastError,
 		&i.RunAt,
+		&i.StartedAt,
+		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -72,7 +131,7 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (tenant_id, email, password_hash, role_id) 
-VALUES (?, ?, ?, ?) RETURNING id, tenant_id, email, password_hash, role_id, is_verified, avatar_url, created_at
+VALUES (?, ?, ?, ?) RETURNING id, tenant_id, email, password_hash, role_id, is_verified, is_active, avatar_url, last_login_at, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -97,15 +156,18 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.RoleID,
 		&i.IsVerified,
+		&i.IsActive,
 		&i.AvatarUrl,
+		&i.LastLoginAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const createWebhook = `-- name: CreateWebhook :one
 INSERT INTO webhooks (source, external_id, payload, headers) 
-VALUES (?, ?, ?, ?) RETURNING id, source, external_id, payload, headers, status, created_at
+VALUES (?, ?, ?, ?) RETURNING id, source, external_id, payload, headers, status, processed_at, error_message, created_at
 `
 
 type CreateWebhookParams struct {
@@ -130,9 +192,20 @@ func (q *Queries) CreateWebhook(ctx context.Context, arg CreateWebhookParams) (W
 		&i.Payload,
 		&i.Headers,
 		&i.Status,
+		&i.ProcessedAt,
+		&i.ErrorMessage,
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const deleteDeadLetterJob = `-- name: DeleteDeadLetterJob :exec
+DELETE FROM dead_letter_jobs WHERE id = ?
+`
+
+func (q *Queries) DeleteDeadLetterJob(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteDeadLetterJob, id)
+	return err
 }
 
 const deleteEmailVerification = `-- name: DeleteEmailVerification :exec
@@ -141,6 +214,15 @@ DELETE FROM email_verifications WHERE email = ?
 
 func (q *Queries) DeleteEmailVerification(ctx context.Context, email string) error {
 	_, err := q.db.ExecContext(ctx, deleteEmailVerification, email)
+	return err
+}
+
+const deleteJob = `-- name: DeleteJob :exec
+DELETE FROM jobs WHERE id = ?
+`
+
+func (q *Queries) DeleteJob(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteJob, id)
 	return err
 }
 
@@ -167,14 +249,37 @@ func (q *Queries) FailJob(ctx context.Context, arg FailJobParams) error {
 	return err
 }
 
+const getDeadLetterJob = `-- name: GetDeadLetterJob :one
+SELECT id, original_job_id, tenant_id, type, payload, attempt_count, last_error, failed_at, created_at, archived_at FROM dead_letter_jobs WHERE id = ?
+`
+
+func (q *Queries) GetDeadLetterJob(ctx context.Context, id int64) (DeadLetterJob, error) {
+	row := q.db.QueryRowContext(ctx, getDeadLetterJob, id)
+	var i DeadLetterJob
+	err := row.Scan(
+		&i.ID,
+		&i.OriginalJobID,
+		&i.TenantID,
+		&i.Type,
+		&i.Payload,
+		&i.AttemptCount,
+		&i.LastError,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const getEmailVerificationByToken = `-- name: GetEmailVerificationByToken :one
-SELECT email, token, expires_at, created_at FROM email_verifications WHERE token = ? LIMIT 1
+SELECT id, email, token, expires_at, created_at FROM email_verifications WHERE token = ? LIMIT 1
 `
 
 func (q *Queries) GetEmailVerificationByToken(ctx context.Context, token string) (EmailVerification, error) {
 	row := q.db.QueryRowContext(ctx, getEmailVerificationByToken, token)
 	var i EmailVerification
 	err := row.Scan(
+		&i.ID,
 		&i.Email,
 		&i.Token,
 		&i.ExpiresAt,
@@ -184,23 +289,25 @@ func (q *Queries) GetEmailVerificationByToken(ctx context.Context, token string)
 }
 
 const getPasswordResetByToken = `-- name: GetPasswordResetByToken :one
-SELECT email, token_hash, expires_at, created_at FROM password_resets WHERE token_hash = ? LIMIT 1
+SELECT id, email, token_hash, expires_at, used_at, created_at FROM password_resets WHERE token_hash = ? LIMIT 1
 `
 
 func (q *Queries) GetPasswordResetByToken(ctx context.Context, tokenHash string) (PasswordReset, error) {
 	row := q.db.QueryRowContext(ctx, getPasswordResetByToken, tokenHash)
 	var i PasswordReset
 	err := row.Scan(
+		&i.ID,
 		&i.Email,
 		&i.TokenHash,
 		&i.ExpiresAt,
+		&i.UsedAt,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getTenantByID = `-- name: GetTenantByID :one
-SELECT id, name, settings, created_at FROM tenants WHERE id = ? LIMIT 1
+SELECT id, name, settings, created_at, updated_at FROM tenants WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetTenantByID(ctx context.Context, id string) (Tenant, error) {
@@ -211,12 +318,13 @@ func (q *Queries) GetTenantByID(ctx context.Context, id string) (Tenant, error) 
 		&i.Name,
 		&i.Settings,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, tenant_id, email, password_hash, role_id, is_verified, avatar_url, created_at FROM users WHERE tenant_id = ? AND email = ? LIMIT 1
+SELECT id, tenant_id, email, password_hash, role_id, is_verified, is_active, avatar_url, last_login_at, created_at, updated_at FROM users WHERE tenant_id = ? AND email = ? LIMIT 1
 `
 
 type GetUserByEmailParams struct {
@@ -234,14 +342,17 @@ func (q *Queries) GetUserByEmail(ctx context.Context, arg GetUserByEmailParams) 
 		&i.PasswordHash,
 		&i.RoleID,
 		&i.IsVerified,
+		&i.IsActive,
 		&i.AvatarUrl,
+		&i.LastLoginAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, tenant_id, email, password_hash, role_id, is_verified, avatar_url, created_at FROM users WHERE id = ? LIMIT 1
+SELECT id, tenant_id, email, password_hash, role_id, is_verified, is_active, avatar_url, last_login_at, created_at, updated_at FROM users WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
@@ -254,8 +365,11 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 		&i.PasswordHash,
 		&i.RoleID,
 		&i.IsVerified,
+		&i.IsActive,
 		&i.AvatarUrl,
+		&i.LastLoginAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -271,8 +385,108 @@ func (q *Queries) IsJobProcessed(ctx context.Context, jobID int64) (int64, error
 	return column_1, err
 }
 
+const listDeadLetterJobs = `-- name: ListDeadLetterJobs :many
+SELECT id, original_job_id, tenant_id, type, payload, attempt_count, last_error, failed_at, created_at, archived_at FROM dead_letter_jobs 
+WHERE (?1 = '' OR type = ?1) 
+ORDER BY failed_at DESC 
+LIMIT ?2 OFFSET ?3
+`
+
+type ListDeadLetterJobsParams struct {
+	Column1 interface{} `json:"column_1"`
+	Limit   int64       `json:"limit"`
+	Offset  int64       `json:"offset"`
+}
+
+func (q *Queries) ListDeadLetterJobs(ctx context.Context, arg ListDeadLetterJobsParams) ([]DeadLetterJob, error) {
+	rows, err := q.db.QueryContext(ctx, listDeadLetterJobs, arg.Column1, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DeadLetterJob
+	for rows.Next() {
+		var i DeadLetterJob
+		if err := rows.Scan(
+			&i.ID,
+			&i.OriginalJobID,
+			&i.TenantID,
+			&i.Type,
+			&i.Payload,
+			&i.AttemptCount,
+			&i.LastError,
+			&i.FailedAt,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listJobs = `-- name: ListJobs :many
+
+SELECT id, tenant_id, type, payload, status, idempotency_key, attempt_count, max_attempts, last_error, run_at, started_at, completed_at, created_at, updated_at FROM jobs 
+WHERE (?1 = '' OR status = ?1)
+ORDER BY created_at DESC 
+LIMIT ?2 OFFSET ?3
+`
+
+type ListJobsParams struct {
+	Column1 interface{} `json:"column_1"`
+	Limit   int64       `json:"limit"`
+	Offset  int64       `json:"offset"`
+}
+
+// === JOBS MANAGEMENT ===
+func (q *Queries) ListJobs(ctx context.Context, arg ListJobsParams) ([]Job, error) {
+	rows, err := q.db.QueryContext(ctx, listJobs, arg.Column1, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Job
+	for rows.Next() {
+		var i Job
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Type,
+			&i.Payload,
+			&i.Status,
+			&i.IdempotencyKey,
+			&i.AttemptCount,
+			&i.MaxAttempts,
+			&i.LastError,
+			&i.RunAt,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsersPaginated = `-- name: ListUsersPaginated :many
-SELECT id, tenant_id, email, password_hash, role_id, is_verified, avatar_url, created_at FROM users 
+SELECT id, tenant_id, email, password_hash, role_id, is_verified, is_active, avatar_url, last_login_at, created_at, updated_at FROM users 
 WHERE tenant_id = ? 
 AND (email LIKE '%' || ? || '%' OR ? = '')
 ORDER BY created_at DESC 
@@ -309,8 +523,11 @@ func (q *Queries) ListUsersPaginated(ctx context.Context, arg ListUsersPaginated
 			&i.PasswordHash,
 			&i.RoleID,
 			&i.IsVerified,
+			&i.IsActive,
 			&i.AvatarUrl,
+			&i.LastLoginAt,
 			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -325,6 +542,18 @@ func (q *Queries) ListUsersPaginated(ctx context.Context, arg ListUsersPaginated
 	return items, nil
 }
 
+const moveToDeadLetter = `-- name: MoveToDeadLetter :exec
+
+INSERT INTO dead_letter_jobs (original_job_id, tenant_id, type, payload, attempt_count, last_error)
+SELECT jobs.id, jobs.tenant_id, jobs.type, jobs.payload, jobs.attempt_count, jobs.last_error FROM jobs WHERE jobs.id = ?
+`
+
+// === DEAD LETTER QUEUE ===
+func (q *Queries) MoveToDeadLetter(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, moveToDeadLetter, id)
+	return err
+}
+
 const pickNextJob = `-- name: PickNextJob :one
 UPDATE jobs 
 SET status = 'processing', updated_at = CURRENT_TIMESTAMP
@@ -332,7 +561,7 @@ WHERE id = (
     SELECT id FROM jobs 
     WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP 
     ORDER BY run_at ASC LIMIT 1
-) RETURNING id, tenant_id, type, payload, status, idempotency_key, attempt_count, max_attempts, last_error, run_at, created_at, updated_at
+) RETURNING id, tenant_id, type, payload, status, idempotency_key, attempt_count, max_attempts, last_error, run_at, started_at, completed_at, created_at, updated_at
 `
 
 func (q *Queries) PickNextJob(ctx context.Context) (Job, error) {
@@ -349,6 +578,8 @@ func (q *Queries) PickNextJob(ctx context.Context) (Job, error) {
 		&i.MaxAttempts,
 		&i.LastError,
 		&i.RunAt,
+		&i.StartedAt,
+		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -365,6 +596,34 @@ func (q *Queries) RecordJobProcessed(ctx context.Context, jobID int64) error {
 	return err
 }
 
+const reprocessDeadLetterJob = `-- name: ReprocessDeadLetterJob :one
+INSERT INTO jobs (tenant_id, type, payload, run_at)
+SELECT tenant_id, type, payload, CURRENT_TIMESTAMP FROM dead_letter_jobs WHERE dead_letter_jobs.id = ?
+RETURNING id, tenant_id, type, payload, status, idempotency_key, attempt_count, max_attempts, last_error, run_at, started_at, completed_at, created_at, updated_at
+`
+
+func (q *Queries) ReprocessDeadLetterJob(ctx context.Context, id int64) (Job, error) {
+	row := q.db.QueryRowContext(ctx, reprocessDeadLetterJob, id)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Type,
+		&i.Payload,
+		&i.Status,
+		&i.IdempotencyKey,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.LastError,
+		&i.RunAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const rescueZombies = `-- name: RescueZombies :exec
 UPDATE jobs 
 SET status = 'pending', attempt_count = attempt_count + 1 
@@ -373,6 +632,15 @@ WHERE status = 'processing' AND updated_at < datetime('now', '-5 minutes')
 
 func (q *Queries) RescueZombies(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, rescueZombies)
+	return err
+}
+
+const retryJob = `-- name: RetryJob :exec
+UPDATE jobs SET status = 'pending', attempt_count = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+`
+
+func (q *Queries) RetryJob(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, retryJob, id)
 	return err
 }
 

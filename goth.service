@@ -1,0 +1,23 @@
+[Unit]
+Description=GOTH Stack Application
+After=network.target
+
+[Service]
+Type=simple
+User=goth
+Group=goth
+WorkingDirectory=/opt/goth
+ExecStart=/opt/goth/bin/goth server
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+Environment=APP_ENV=prod
+EnvironmentFile=/opt/goth/.env
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=goth
+
+[Install]
+WantedBy=multi-user.target

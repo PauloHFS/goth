@@ -12,6 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alexedwards/scs/sqlite3store"
+	"github.com/alexedwards/scs/v2"
+	"github.com/justinas/nosurf"
+	"github.com/klauspost/compress/gzhttp"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	httpSwagger "github.com/swaggo/http-swagger"
+
 	_ "github.com/PauloHFS/goth/docs"
 	"github.com/PauloHFS/goth/internal/config"
 	"github.com/PauloHFS/goth/internal/db"
@@ -20,11 +27,6 @@ import (
 	"github.com/PauloHFS/goth/internal/web"
 	"github.com/PauloHFS/goth/internal/webhook"
 	"github.com/PauloHFS/goth/internal/worker"
-	"github.com/alexedwards/scs/sqlite3store"
-	"github.com/alexedwards/scs/v2"
-	"github.com/justinas/nosurf"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/swaggo/http-swagger"
 )
 
 // @title GOTH Stack API
@@ -132,7 +134,6 @@ func RunServer(assetsFS embed.FS) {
 		DB:             dbConn,
 		Queries:        queries,
 		SessionManager: sessionManager,
-		Logger:         logger,
 		Config:         cfg,
 	})
 
@@ -144,7 +145,7 @@ func RunServer(assetsFS embed.FS) {
 	})
 
 	handler := middleware.Recovery(
-		middleware.RateLimit(
+		middleware.RateLimitDefault(
 			middleware.SecurityHeaders(cfg.Env == "prod")(
 				middleware.Logger(
 					middleware.Locale(
@@ -157,9 +158,11 @@ func RunServer(assetsFS embed.FS) {
 		),
 	)
 
+	compressedHandler := gzhttp.GzipHandler(handler)
+
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: handler,
+		Handler: compressedHandler,
 	}
 
 	done := make(chan os.Signal, 1)

@@ -48,9 +48,27 @@ func Init() {
 		version = "dev"
 	}
 
+	commitHash := os.Getenv("COMMIT_HASH")
+	if commitHash == "" {
+		commitHash = "unknown"
+	}
+
+	region := os.Getenv("REGION")
+	if region == "" {
+		region = "local"
+	}
+
+	instanceID := os.Getenv("INSTANCE_ID")
+	if instanceID == "" {
+		instanceID = "unknown"
+	}
+
 	logger = slog.New(handler).With(
 		slog.String("version", version),
 		slog.String("service", "goth-api"),
+		slog.String("commit_hash", commitHash),
+		slog.String("region", region),
+		slog.String("instance_id", instanceID),
 	)
 
 	slog.SetDefault(logger)

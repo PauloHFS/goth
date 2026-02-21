@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/PauloHFS/goth/internal/contextkeys"
+	"github.com/PauloHFS/goth/internal/db"
 	"github.com/PauloHFS/goth/internal/logging"
 	"github.com/PauloHFS/goth/internal/metrics"
 	"github.com/google/uuid"
@@ -56,19 +58,28 @@ func Logger(next http.Handler) http.Handler {
 			slog.String("user_agent", r.UserAgent()),
 		)
 
+		if user, ok := r.Context().Value(contextkeys.UserContextKey).(db.User); ok {
+			event.Add(slog.Int64("user_id", user.ID))
+		}
+
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 
 		next.ServeHTTP(rw, r.WithContext(ctx))
 
 		duration := time.Since(start)
 
+		outcome := "success"
+		if rw.status >= 400 {
+			outcome = "error"
+		}
+
 		event.Add(
 			slog.Int("status", rw.status),
 			slog.Int("size", rw.size),
+			slog.String("outcome", outcome),
 			duration_ms(duration),
 		)
 
-		// Prometheus Metrics
 		metrics.HttpRequestsTotal.WithLabelValues(r.URL.Path, r.Method, strconv.Itoa(rw.status)).Inc()
 
 		level := slog.LevelInfo
