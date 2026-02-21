@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
+
+	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )
 
 type Service struct {
@@ -23,22 +24,27 @@ func (s *Service) Store(ctx context.Context, embedding Embedding) (int64, error)
 		return 0, fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
-	vectorJSON, err := json.Marshal(embedding.Vector)
+	// Converter float64 para float32 e serializar
+	vector32 := make([]float32, len(embedding.Vector))
+	for i, v := range embedding.Vector {
+		vector32[i] = float32(v)
+	}
+
+	vectorBin, err := sqlitevec.SerializeFloat32(vector32)
 	if err != nil {
-		return 0, fmt.Errorf("failed to marshal vector: %w", err)
+		return 0, fmt.Errorf("failed to serialize vector: %w", err)
 	}
 
 	query := fmt.Sprintf(`
-		INSERT INTO %s (content_type, content_id, embedding, metadata, created_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO %s (content_type, content_id, embedding, metadata)
+		VALUES (?, ?, ?, ?)
 	`, s.store.Config().TableName)
 
 	result, err := s.store.DB().ExecContext(ctx, query,
 		embedding.ContentType,
 		embedding.ContentID,
-		string(vectorJSON),
+		vectorBin,
 		string(metadataJSON),
-		time.Now(),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert embedding: %w", err)
@@ -59,8 +65,8 @@ func (s *Service) Upsert(ctx context.Context, embedding Embedding) (int64, error
 	}
 
 	query := fmt.Sprintf(`
-		INSERT INTO %s (content_type, content_id, embedding, metadata, created_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO %s (content_type, content_id, embedding, metadata)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			content_type = excluded.content_type,
 			content_id = excluded.content_id,
@@ -73,7 +79,6 @@ func (s *Service) Upsert(ctx context.Context, embedding Embedding) (int64, error
 		embedding.ContentID,
 		string(vectorJSON),
 		string(metadataJSON),
-		time.Now(),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to upsert embedding: %w", err)
@@ -85,11 +90,6 @@ func (s *Service) Upsert(ctx context.Context, embedding Embedding) (int64, error
 func (s *Service) Search(ctx context.Context, contentType string, queryVector []float64, limit int, metric DistanceMetric) ([]SearchResult, error) {
 	if limit <= 0 {
 		limit = 10
-	}
-
-	queryVectorJSON, err := json.Marshal(queryVector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal query vector: %w", err)
 	}
 
 	var distanceFunc string
@@ -105,16 +105,26 @@ func (s *Service) Search(ctx context.Context, contentType string, queryVector []
 	}
 
 	query := fmt.Sprintf(`
-		SELECT 
-			id, content_type, content_id, embedding, metadata, created_at,
-			%s(embedding, '%s') as distance
+		SELECT
+			id, content_type, content_id, vec_to_json(embedding) as embedding, metadata,
+			%s(embedding, ?) as distance
 		FROM %s
 		WHERE content_type = ?
 		ORDER BY distance
 		LIMIT ?
-	`, distanceFunc, string(queryVectorJSON), s.store.Config().TableName)
+	`, distanceFunc, s.store.Config().TableName)
 
-	rows, err := s.store.DB().QueryContext(ctx, query, contentType, limit)
+	// Serializar queryVector para formato binário
+	queryVector32 := make([]float32, len(queryVector))
+	for i, v := range queryVector {
+		queryVector32[i] = float32(v)
+	}
+	queryVectorBin, err := sqlitevec.SerializeFloat32(queryVector32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize query vector: %w", err)
+	}
+
+	rows, err := s.store.DB().QueryContext(ctx, query, queryVectorBin, contentType, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search embeddings: %w", err)
 	}
@@ -133,7 +143,6 @@ func (s *Service) Search(ctx context.Context, contentType string, queryVector []
 			&e.ContentID,
 			&embeddingJSON,
 			&metadataJSON,
-			&e.CreatedAt,
 			&distance,
 		)
 		if err != nil {
@@ -164,11 +173,6 @@ func (s *Service) SearchGlobal(ctx context.Context, queryVector []float64, limit
 		limit = 10
 	}
 
-	queryVectorJSON, err := json.Marshal(queryVector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal query vector: %w", err)
-	}
-
 	var distanceFunc string
 	switch metric {
 	case DistanceCosine:
@@ -182,15 +186,25 @@ func (s *Service) SearchGlobal(ctx context.Context, queryVector []float64, limit
 	}
 
 	query := fmt.Sprintf(`
-		SELECT 
-			id, content_type, content_id, embedding, metadata, created_at,
-			%s(embedding, '%s') as distance
+		SELECT
+			id, content_type, content_id, vec_to_json(embedding) as embedding, metadata,
+			%s(embedding, ?) as distance
 		FROM %s
 		ORDER BY distance
 		LIMIT ?
-	`, distanceFunc, string(queryVectorJSON), s.store.Config().TableName)
+	`, distanceFunc, s.store.Config().TableName)
 
-	rows, err := s.store.DB().QueryContext(ctx, query, limit)
+	// Serializar queryVector para formato binário
+	queryVector32 := make([]float32, len(queryVector))
+	for i, v := range queryVector {
+		queryVector32[i] = float32(v)
+	}
+	queryVectorBin, err := sqlitevec.SerializeFloat32(queryVector32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize query vector: %w", err)
+	}
+
+	rows, err := s.store.DB().QueryContext(ctx, query, queryVectorBin, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search embeddings: %w", err)
 	}
@@ -209,7 +223,6 @@ func (s *Service) SearchGlobal(ctx context.Context, queryVector []float64, limit
 			&e.ContentID,
 			&embeddingJSON,
 			&metadataJSON,
-			&e.CreatedAt,
 			&distance,
 		)
 		if err != nil {
@@ -266,7 +279,7 @@ func (s *Service) DeleteByIDs(ctx context.Context, ids []int64) error {
 
 func (s *Service) GetByContent(ctx context.Context, contentType string, contentID int64) (*Embedding, error) {
 	query := fmt.Sprintf(`
-		SELECT id, content_type, content_id, embedding, metadata, created_at
+		SELECT id, content_type, content_id, embedding, metadata
 		FROM %s WHERE content_type = ? AND content_id = ?
 	`, s.store.Config().TableName)
 
@@ -280,7 +293,6 @@ func (s *Service) GetByContent(ctx context.Context, contentType string, contentI
 		&e.ContentID,
 		&embeddingJSON,
 		&metadataJSON,
-		&e.CreatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil

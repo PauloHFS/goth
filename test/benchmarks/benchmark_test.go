@@ -3,6 +3,7 @@ package benchmarks
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"os"
@@ -11,8 +12,10 @@ import (
 
 	"github.com/PauloHFS/goth/internal/contextkeys"
 	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/vector"
 	"github.com/PauloHFS/goth/internal/view"
 	"github.com/PauloHFS/goth/internal/view/pages"
+	sqlitevec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -185,4 +188,267 @@ func BenchmarkPasswordHashing(b *testing.B) {
 			_, _ = bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		}
 	})
+}
+
+// ============================================
+// Vector Search Benchmarks (sqlite-vec)
+// ============================================
+
+func setupVectorService(b *testing.B, dbConn *sql.DB, dimension int) *vector.Service {
+	config := vector.Config{
+		Enabled:            true,
+		EmbeddingDimension: dimension,
+		TableName:          "vectors_test",
+	}
+
+	store := vector.NewStore(dbConn, config)
+
+	ctx := context.Background()
+	if err := store.EnsureTable(ctx); err != nil {
+		b.Fatal(err)
+	}
+
+	return vector.NewService(store)
+}
+
+func generateRandomVector(dimension int) []float64 {
+	vec := make([]float64, dimension)
+	for i := range vec {
+		vec[i] = float64(i%100) / 100.0
+	}
+	return vec
+}
+
+func BenchmarkVector_Insert(b *testing.B) {
+	dbConn, _ := setupTestDB(b, "single")
+	service := setupVectorService(b, dbConn, 128)
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		embedding := vector.Embedding{
+			ContentType: "document",
+			ContentID:   int64(i),
+			Vector:      generateRandomVector(128),
+			Metadata: map[string]any{
+				"title": fmt.Sprintf("Doc %d", i),
+			},
+		}
+
+		_, err := service.Store(ctx, embedding)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkVector_Search_Cosine(b *testing.B) {
+	dbConn, _ := setupTestDB(b, "single")
+	service := setupVectorService(b, dbConn, 128)
+
+	ctx := context.Background()
+
+	// Inserir 1000 vetores para busca
+	for i := 0; i < 1000; i++ {
+		embedding := vector.Embedding{
+			ContentType: "document",
+			ContentID:   int64(i),
+			Vector:      generateRandomVector(128),
+			Metadata:    map[string]any{"title": fmt.Sprintf("Doc %d", i)},
+		}
+		_, _ = service.Store(ctx, embedding)
+	}
+
+	queryVector := generateRandomVector(128)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := service.Search(ctx, "document", queryVector, 10, vector.DistanceCosine)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(results) == 0 {
+			b.Error("expected results")
+		}
+	}
+}
+
+func BenchmarkVector_Search_L2(b *testing.B) {
+	dbConn, _ := setupTestDB(b, "single")
+	service := setupVectorService(b, dbConn, 128)
+
+	ctx := context.Background()
+
+	for i := 0; i < 1000; i++ {
+		embedding := vector.Embedding{
+			ContentType: "document",
+			ContentID:   int64(i),
+			Vector:      generateRandomVector(128),
+			Metadata:    map[string]any{"title": fmt.Sprintf("Doc %d", i)},
+		}
+		_, _ = service.Store(ctx, embedding)
+	}
+
+	queryVector := generateRandomVector(128)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := service.Search(ctx, "document", queryVector, 10, vector.DistanceL2)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(results) == 0 {
+			b.Error("expected results")
+		}
+	}
+}
+
+func BenchmarkVector_Search_Global(b *testing.B) {
+	dbConn, _ := setupTestDB(b, "single")
+	service := setupVectorService(b, dbConn, 128)
+
+	ctx := context.Background()
+
+	for i := 0; i < 1000; i++ {
+		embedding := vector.Embedding{
+			ContentType: "document",
+			ContentID:   int64(i),
+			Vector:      generateRandomVector(128),
+			Metadata:    map[string]any{"title": fmt.Sprintf("Doc %d", i)},
+		}
+		_, _ = service.Store(ctx, embedding)
+	}
+
+	queryVector := generateRandomVector(128)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := service.SearchGlobal(ctx, queryVector, 10, vector.DistanceCosine)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(results) == 0 {
+			b.Error("expected results")
+		}
+	}
+}
+
+func BenchmarkVector_BatchInsert(b *testing.B) {
+	dbConn, _ := setupTestDB(b, "single")
+	_ = setupVectorService(b, dbConn, 128)
+
+	ctx := context.Background()
+	batchSize := 100
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tx, err := dbConn.BeginTx(ctx, nil)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		for j := 0; j < batchSize; j++ {
+			idx := i*batchSize + j
+			vectorData := generateRandomVector(128)
+			metadata := map[string]any{"title": fmt.Sprintf("Doc %d", idx)}
+
+			// Converter para float32 e serializar
+			vector32 := make([]float32, len(vectorData))
+			for k, v := range vectorData {
+				vector32[k] = float32(v)
+			}
+			vectorBin, err := sqlitevec.SerializeFloat32(vector32)
+			if err != nil {
+				tx.Rollback()
+				b.Fatal(err)
+			}
+
+			metadataJSON, _ := json.Marshal(metadata)
+
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO vectors_test (content_type, content_id, embedding, metadata) VALUES (?, ?, ?, ?)`,
+				"document",
+				int64(idx),
+				vectorBin,
+				string(metadataJSON),
+			)
+			if err != nil {
+				tx.Rollback()
+				b.Fatal(err)
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkVector_ConcurrentSearch(b *testing.B) {
+	dbConn, _ := setupTestDB(b, "dual")
+	service := setupVectorService(b, dbConn, 128)
+
+	ctx := context.Background()
+
+	for i := 0; i < 1000; i++ {
+		embedding := vector.Embedding{
+			ContentType: "document",
+			ContentID:   int64(i),
+			Vector:      generateRandomVector(128),
+			Metadata:    map[string]any{"title": fmt.Sprintf("Doc %d", i)},
+		}
+		_, _ = service.Store(ctx, embedding)
+	}
+
+	queryVector := generateRandomVector(128)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			results, err := service.Search(ctx, "document", queryVector, 10, vector.DistanceCosine)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if len(results) == 0 {
+				b.Error("expected results")
+			}
+		}
+	})
+}
+
+func BenchmarkVector_Dimension_Scale(b *testing.B) {
+	dimensions := []int{64, 128, 256}
+
+	for _, dim := range dimensions {
+		b.Run(fmt.Sprintf("Dim%d", dim), func(b *testing.B) {
+			dbConn, _ := setupTestDB(b, "single")
+			service := setupVectorService(b, dbConn, dim)
+
+			ctx := context.Background()
+
+			for i := 0; i < 200; i++ {
+				embedding := vector.Embedding{
+					ContentType: "document",
+					ContentID:   int64(i),
+					Vector:      generateRandomVector(dim),
+					Metadata:    map[string]any{"title": fmt.Sprintf("Doc %d", i)},
+				}
+				_, _ = service.Store(ctx, embedding)
+			}
+
+			queryVector := generateRandomVector(dim)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				results, err := service.Search(ctx, "document", queryVector, 10, vector.DistanceCosine)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(results) == 0 {
+					b.Error("expected results")
+				}
+			}
+		})
+	}
 }

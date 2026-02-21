@@ -36,20 +36,14 @@ func (s *Store) EnsureTable(ctx context.Context) error {
 	query := fmt.Sprintf(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS %s USING vec0(
 			id INTEGER PRIMARY KEY,
-			content_type TEXT NOT NULL,
-			content_id INTEGER NOT NULL,
+			content_type TEXT,
+			content_id INTEGER,
 			embedding float[%d],
-			metadata TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-		
-		CREATE INDEX IF NOT EXISTS idx_%s_content ON %s(content_type, content_id);
-		CREATE INDEX IF NOT EXISTS idx_%s_content_type ON %s(content_type);
+			metadata TEXT
+		)
 	`,
 		s.config.TableName,
 		s.config.EmbeddingDimension,
-		s.config.TableName, s.config.TableName,
-		s.config.TableName, s.config.TableName,
 	)
 
 	_, err := s.db.ExecContext(ctx, query)
