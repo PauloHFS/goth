@@ -12,11 +12,16 @@ A filosofia GOTH orienta o desenvolvimento deste sistema através de cinco pilar
 4. Single Binary: Assets, migrações de banco de dados, documentação API e o executável são consolidados em um único arquivo binário via go:embed.
 5. Resiliência Operacional: Sistema de background jobs com rastreio de idempotência e recuperação automática de processos interrompidos (zombie recovery).
 
+## Trade-offs Arquiteturais
+
+> **Atenção — Escalabilidade Horizontal:** A camada de persistência baseada em SQLite (arquivo local) impõe uma limitação fundamental de escalabilidade horizontal. Esta arquitetura prioriza escalabilidade vertical (mais recursos no mesmo servidor), simplicidade operacional e performance em cenários de leitura intensiva. Para cargas de trabalho que exigem distribuição multi-região ou escrita massivamente concorrente, considere migrar para um banco de dados cliente-servidor (PostgreSQL, MySQL).
+
 ## Stack Tecnológico
 
 | Componente | Tecnologia | Detalhe |
 | --- | --- | --- |
 | Linguagem | Go 1.24+ | Biblioteca padrão e arquitetura modular |
+| Roteador HTTP | http.ServeMux | Router nativo Go 1.22+ com pattern matching |
 | Banco de Dados | SQLite | WAL Mode, FTS5, Foreign Keys |
 | Interface | Templ | Server-Side Rendering type-safe |
 | Interatividade | HTMX | Comunicação assíncrona servidor-cliente |
@@ -43,6 +48,62 @@ A filosofia GOTH orienta o desenvolvimento deste sistema através de cinco pilar
 └── storage/                # Diretório de persistência de arquivos (local)
 ```
 
+## Fluxo de Desenvolvimento de Features
+
+Este documento descreve o fluxo prático ponta a ponta para implementação de novas funcionalidades:
+
+### 1. Criação da Tabela SQL
+
+Crie um arquivo de migração em `migrations/` definindo o esquema da tabela:
+
+```sql
+-- migrations/003_create_products.sql
+CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 2. Geração de Código via sqlc
+
+Execute o sqlc para gerar os tipos e queries type-safe:
+
+```bash
+go tool sqlc generate
+```
+
+Isso produzirá código Go em `internal/db/` baseado nas queries definidas em `internal/db/query/`.
+
+### 3. Implementação do Handler HTTP
+
+Crie o handler em `internal/web/handlers.go` seguindo o padrão existente:
+
+```go
+func handleListProducts(deps HandlerDeps, w http.ResponseWriter, r *http.Request) error {
+    products, err := deps.Queries.ListProducts(r.Context())
+    if err != nil {
+        return err
+    }
+    return templ.Render(w, pages.ProductsList(products))
+}
+```
+
+### 4. Registro da Rota
+
+Registre a nova rota em `internal/web/handlers.go` na função `RegisterRoutes`:
+
+```go
+mux.Handle("GET "+routes.Products, middleware.RequireAuth(deps.SessionManager, deps.Queries, Handle(deps, handleListProducts)))
+```
+
+Adicione a constante da rota em `internal/routes/routes.go`:
+
+```go
+Products = "/products"
+```
+
 ## Desenvolvimento
 
 ### Pré-requisitos
@@ -63,18 +124,23 @@ Para contribuir com este projeto, é necessário instalar as seguintes dependên
 
 ### Procedimento Inicial
 
-1. Instalação de dependências do Go e NPM:
+1. Copie o arquivo de variáveis de ambiente:
+```bash
+cp .env.example .env
+```
+
+2. Instalação de dependências do Go e NPM:
 ```bash
 go mod download
 npm install
 ```
 
-2. Ativação dos Git Hooks:
+3. Ativação dos Git Hooks:
 ```bash
 go tool lefthook install
 ```
 
-3. Inicialização do ambiente de desenvolvimento:
+4. Inicialização do ambiente de desenvolvimento:
 ```bash
 make dev
 ```
