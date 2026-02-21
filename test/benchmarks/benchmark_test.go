@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/rand"
 	"net/http/httptest"
 	"os"
 	"runtime"
@@ -450,5 +452,268 @@ func BenchmarkVector_Dimension_Scale(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+// ============================================
+// Production-Realistic Vector Benchmarks
+// ============================================
+
+var prodDBCache = make(map[string]*sql.DB)
+var prodServiceCache = make(map[string]*vector.Service)
+
+func setupProductionVectorDB(b *testing.B, numVectors int, dimension int) (*sql.DB, *vector.Service) {
+	cacheKey := fmt.Sprintf("%d_%d", numVectors, dimension)
+
+	if db, ok := prodDBCache[cacheKey]; ok {
+		if service, ok := prodServiceCache[cacheKey]; ok {
+			return db, service
+		}
+	}
+
+	dbFile := fmt.Sprintf("test_prod_vector_%s.db", cacheKey)
+	dsn := dbFile + "?_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL&_cache_size=-64000"
+
+	dbConn, err := sql.Open(driverName, dsn)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	dbConn.SetMaxOpenConns(runtime.NumCPU() * 2)
+	dbConn.SetMaxIdleConns(runtime.NumCPU())
+
+	config := vector.Config{
+		Enabled:            true,
+		EmbeddingDimension: dimension,
+		TableName:          "vectors_prod",
+	}
+
+	store := vector.NewStore(dbConn, config)
+	ctx := context.Background()
+
+	if err := store.EnsureTable(ctx); err != nil {
+		b.Fatal(err)
+	}
+
+	service := vector.NewService(store)
+
+	// Warmup: inserir vetores uma vez (fora do timer)
+	b.Logf("Inserting %d vectors for warmup...", numVectors)
+	for i := 0; i < numVectors; i++ {
+		embedding := vector.Embedding{
+			ContentType: "document",
+			ContentID:   int64(i),
+			Vector:      generateRealisticVector(dimension, i%10),
+			Metadata: map[string]any{
+				"tenant_id": fmt.Sprintf("tenant_%d", i%100),
+				"category":  fmt.Sprintf("cat_%d", i%50),
+				"priority":  i % 3,
+				"created":   "2024-01-01",
+			},
+		}
+		_, _ = service.Store(ctx, embedding)
+	}
+	b.Logf("Warmup complete")
+
+	// Cachear para reuso
+	prodDBCache[cacheKey] = dbConn
+	prodServiceCache[cacheKey] = service
+
+	return dbConn, service
+}
+
+// Gera vetor com estrutura mais realista (clusters, não aleatório puro)
+func generateRealisticVector(dimension int, clusterID int) []float64 {
+	vec := make([]float64, dimension)
+	base := float64(clusterID) / 10.0
+
+	// Usar gerador local para evitar race condition em testes concorrentes
+	localRand := rand.New(rand.NewSource(rand.Int63()))
+
+	for i := range vec {
+		// Adiciona variação baseada no cluster + ruído
+		clusterOffset := math.Sin(float64(i+clusterID)*0.1) * 0.3
+		noise := (localRand.Float64() - 0.5) * 0.2
+		vec[i] = base + clusterOffset + noise
+
+		// Normaliza para [-1, 1]
+		if vec[i] > 1 {
+			vec[i] = 1
+		} else if vec[i] < -1 {
+			vec[i] = -1
+		}
+	}
+	return vec
+}
+
+func BenchmarkVector_KNN_Index(b *testing.B) {
+	_, service := setupProductionVectorDB(b, 10000, 384)
+	ctx := context.Background()
+
+	queryVector := generateRealisticVector(384, 5)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := service.Search(ctx, "document", queryVector, 20, vector.DistanceCosine)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(results) == 0 {
+			b.Error("expected results")
+		}
+	}
+}
+
+func BenchmarkVector_WithMetadataFilter(b *testing.B) {
+	_, service := setupProductionVectorDB(b, 10000, 384)
+	ctx := context.Background()
+
+	queryVector := generateRealisticVector(384, 5)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Simula filtro por tenant + categoria
+		results, err := service.Search(ctx, "document", queryVector, 20, vector.DistanceCosine)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		// Filtrar resultados por metadata (simula WHERE no app layer)
+		filtered := 0
+		for _, r := range results {
+			if tenant, ok := r.Metadata["tenant_id"].(string); ok {
+				if tenant == "tenant_5" {
+					filtered++
+				}
+			}
+		}
+		_ = filtered
+	}
+}
+
+func BenchmarkVector_ProductionScale(b *testing.B) {
+	// 10K vetores com 768 dimensões (BGE-large)
+	_, service := setupProductionVectorDB(b, 10000, 768)
+	ctx := context.Background()
+
+	queryVector := generateRealisticVector(768, 42)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := service.Search(ctx, "document", queryVector, 10, vector.DistanceCosine)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(results) == 0 {
+			b.Error("expected results")
+		}
+	}
+}
+
+func BenchmarkVector_OpenAI_Dimensions(b *testing.B) {
+	// 5K vetores com 1536 dimensões (OpenAI ada-002)
+	_, service := setupProductionVectorDB(b, 5000, 1536)
+	ctx := context.Background()
+
+	queryVector := generateRealisticVector(1536, 100)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := service.Search(ctx, "document", queryVector, 10, vector.DistanceCosine)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(results) == 0 {
+			b.Error("expected results")
+		}
+	}
+}
+
+func BenchmarkVector_MixedWorkload(b *testing.B) {
+	_, service := setupProductionVectorDB(b, 10000, 384)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		readCount := 0
+		for pb.Next() {
+			readCount++
+
+			// 80% leituras, 20% escritas
+			if readCount%5 == 0 {
+				// Escrita: novo embedding
+				embedding := vector.Embedding{
+					ContentType: "document",
+					ContentID:   int64(readCount),
+					Vector:      generateRealisticVector(384, readCount%10),
+					Metadata: map[string]any{
+						"tenant_id": fmt.Sprintf("tenant_%d", readCount%100),
+						"category":  fmt.Sprintf("cat_%d", readCount%50),
+					},
+				}
+				_, _ = service.Store(ctx, embedding)
+			} else {
+				// Leitura: busca por similaridade
+				queryVector := generateRealisticVector(384, readCount%100)
+				results, err := service.Search(ctx, "document", queryVector, 10, vector.DistanceCosine)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(results) == 0 {
+					b.Error("expected results")
+				}
+			}
+		}
+	})
+}
+
+func BenchmarkVector_ConcurrentFilteredSearch(b *testing.B) {
+	_, service := setupProductionVectorDB(b, 10000, 384)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		tenantID := fmt.Sprintf("tenant_%d", rand.Intn(100))
+		for pb.Next() {
+			queryVector := generateRealisticVector(384, rand.Intn(100))
+			results, err := service.Search(ctx, "document", queryVector, 20, vector.DistanceCosine)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			// Filtrar por tenant
+			for _, r := range results {
+				if t, ok := r.Metadata["tenant_id"].(string); ok && t == tenantID {
+					break
+				}
+			}
+		}
+	})
+}
+
+func BenchmarkVector_WALCheckpoint(b *testing.B) {
+	dbConn, service := setupProductionVectorDB(b, 10000, 384)
+	ctx := context.Background()
+
+	// Forçar checkpoint inicial
+	_, _ = dbConn.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Inserir 100 vetores
+		for j := 0; j < 100; j++ {
+			embedding := vector.Embedding{
+				ContentType: "document",
+				ContentID:   int64(i*100 + j),
+				Vector:      generateRealisticVector(384, j%10),
+				Metadata:    map[string]any{"batch": i},
+			}
+			_, _ = service.Store(ctx, embedding)
+		}
+
+		// Checkpoint a cada 10 iterações
+		if i%10 == 0 {
+			_, _ = dbConn.ExecContext(ctx, "PRAGMA wal_checkpoint(PASSIVE)")
+		}
 	}
 }
