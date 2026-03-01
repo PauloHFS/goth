@@ -107,6 +107,33 @@ cp .env.example .env
 
 ---
 
+## 🎨 Rebranding
+
+Para usar este boilerplate em seu próprio projeto:
+
+```bash
+./scripts/rebrand.sh <owner> <project> [domain]
+```
+
+**Exemplos:**
+```bash
+./scripts/rebrand.sh mycompany myapp
+./scripts/rebrand.sh john myproject myproject.com
+```
+
+**O script faz:**
+- ✅ Atualiza todos os imports Go (`github.com/owner/project`)
+- ✅ Atualiza `go.mod` e `go.sum`
+- ✅ Atualiza `config.yaml`, `README.md`, `CONTRIBUTING.md`
+- ✅ Atualiza arquivos Docker e GitHub Actions
+- ✅ Roda `go mod tidy` automaticamente
+- ✅ Regenera código (`make generate`)
+- ✅ Cria backup automático (git stash)
+
+**Rollback:** `git stash pop`
+
+---
+
 ## Production-Ready
 
 ✅ HTTP Server Timeouts (Slowloris protection)
