@@ -273,13 +273,19 @@ func RunServer(assetsFS embed.FS) error {
 	// Auth routes (registered after rate limiter is created)
 	authHandler.RegisterRoutes(mux, authRateLimiter)
 
-	// Middleware chain
-	csrfHandler := nosurf.New(mux)
-	csrfHandler.SetBaseCookie(http.Cookie{
-		HttpOnly: true,
-		Path:     "/",
-		Secure:   cfg.Env == "prod",
-	})
+	// Middleware CSRF com injeção automática de token no contexto
+	// Em desenvolvimento (ENV=dev): bypass do Referer para localhost
+	// Em produção: validação completa do CSRF
+	csrfHandler := httpMiddleware.CSRFHandler(mux)
+
+	// Configurar cookie CSRF
+	if csrf, ok := csrfHandler.(*nosurf.CSRFHandler); ok {
+		csrf.SetBaseCookie(http.Cookie{
+			HttpOnly: true,
+			Path:     "/",
+			Secure:   cfg.Env == "prod", // Apenas HTTPS em produção
+		})
+	}
 
 	// Rate limiting é feito pelo Traefik (ver traefik/dynamic/config.yml)
 	// Middleware chain foca em segurança e observabilidade
@@ -288,11 +294,9 @@ func RunServer(assetsFS embed.FS) error {
 			httpMiddleware.Logger(
 				httpMiddleware.Locale(
 					sessionManager.LoadAndSave(
-						httpMiddleware.InjectCSRF(
-							httpMiddleware.RequestID( // Request ID antes do logger para correlation
-								httpMiddleware.SecurityHeaders(cfg.Env == "prod")( // Security headers
-									httpMiddleware.AddLoggerToContext(logger, csrfHandler),
-								),
+						httpMiddleware.RequestID( // Request ID antes do logger para correlation
+							httpMiddleware.SecurityHeaders(cfg.Env == "prod")( // Security headers
+								httpMiddleware.AddLoggerToContext(logger, csrfHandler),
 							),
 						),
 					),
