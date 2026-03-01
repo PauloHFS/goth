@@ -135,13 +135,17 @@ func SetupTestServer(deps TestServerDeps) *httptest.Server {
 		})
 	}
 
-	// CSRF
-	csrfHandler := nosurf.New(mux)
-	csrfHandler.SetBaseCookie(http.Cookie{
-		HttpOnly: true,
-		Path:     "/",
-		Secure:   false,
-	})
+	// CSRF com injeção automática de token no contexto
+	csrfHandler := httpMiddleware.CSRFHandler(mux)
+
+	// Configurar cookie CSRF
+	if csrf, ok := csrfHandler.(*nosurf.CSRFHandler); ok {
+		csrf.SetBaseCookie(http.Cookie{
+			HttpOnly: true,
+			Path:     "/",
+			Secure:   false,
+		})
+	}
 
 	// Middleware chain (simplified for tests)
 	handler := httpMiddleware.Recovery(
@@ -149,7 +153,7 @@ func SetupTestServer(deps TestServerDeps) *httptest.Server {
 			httpMiddleware.Logger(
 				httpMiddleware.Locale(
 					deps.SessionManager.LoadAndSave(
-						httpMiddleware.InjectCSRF(csrfHandler),
+						httpMiddleware.RequestID(csrfHandler),
 					),
 				),
 			),
