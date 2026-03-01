@@ -2,11 +2,11 @@
 
 Arquitetura monolítica de alta performance baseada em Go, SQLite, Templ e HTMX.
 
-> 📚 **Documentação completa:** [Wiki](https://github.com/PauloHFS/goth.wiki)
+**Documentação completa:** [Wiki](https://github.com/PauloHFS/goth.wiki)
 
 ---
 
-## Quick Start
+## Início Rápido
 
 ```bash
 # Clone
@@ -25,7 +25,7 @@ Acesse: http://localhost:8080
 
 ---
 
-## O GOTH Way
+## Arquitetura GOTH
 
 Cinco pilares fundamentais:
 
@@ -39,14 +39,14 @@ Cinco pilares fundamentais:
 
 ## Stack
 
-| Componente | Tecnologia |
-|------------|------------|
-| Linguagem | Go 1.25+ |
-| Banco de Dados | SQLite (WAL, FTS5, FK) |
-| Frontend | Templ + HTMX |
-| Estilos | Tailwind CSS v4 |
-| Tempo Real | SSE |
-| Jobs | Custom Worker + DLQ |
+| Componente      | Tecnologia                    |
+|-----------------|-------------------------------|
+| Linguagem       | Go 1.25+                      |
+| Banco de Dados  | SQLite (WAL, FTS5, FK)        |
+| Frontend        | Templ + HTMX                  |
+| Estilos         | Tailwind CSS v4               |
+| Tempo Real      | SSE                           |
+| Jobs            | Custom Worker + DLQ           |
 | Observabilidade | Prometheus + Grafana + Loki + Tempo |
 
 ---
@@ -89,7 +89,7 @@ cp .env.example .env
 
 **Variáveis obrigatórias (produção):**
 - `SESSION_SECRET` - `openssl rand -hex 32`
-- `SMTP_USER/SMTP_PASS` - SMTP credentials
+- `SMTP_USER` / `SMTP_PASS` - SMTP credentials
 - `ASAAS_API_KEY` - Asaas payment API key
 
 **Ambientes:** `APP_ENV=dev` (default), `staging`, `prod`
@@ -99,15 +99,42 @@ cp .env.example .env
 ## CLI
 
 ```bash
-./goth server         # Start server
-./goth migrate        # Run migrations
-./goth seed           # Seed database
+./goth server                    # Start server
+./goth migrate                   # Run migrations
+./goth seed                      # Seed database
 ./goth create-user <email> <password>
 ```
 
 ---
 
-## 🎨 Rebranding
+## Production-Ready
+
+- HTTP Server Timeouts (Slowloris protection)
+- Request ID + Log Correlation
+- Circuit Breaker (OAuth, SMTP)
+- Dead Letter Queue
+- OpenTelemetry Tracing
+- Prometheus Metrics + Grafana
+- Structured Logging (slog)
+- Backup (Litestream + S3)
+- Health Checks
+
+---
+
+## Links
+
+| Recurso   | URL                                           |
+|-----------|-----------------------------------------------|
+| **Wiki**  | https://github.com/PauloHFS/goth.wiki         |
+| Swagger   | http://localhost:8080/swagger                 |
+| Health    | http://localhost:8080/health                  |
+| Metrics   | http://localhost:8080/metrics                 |
+| Grafana   | http://localhost:3001                         |
+| Tempo     | http://localhost:3200                         |
+
+---
+
+## Rebranding
 
 Para usar este boilerplate em seu próprio projeto:
 
@@ -122,42 +149,15 @@ Para usar este boilerplate em seu próprio projeto:
 ```
 
 **O script faz:**
-- ✅ Atualiza todos os imports Go (`github.com/owner/project`)
-- ✅ Atualiza `go.mod` e `go.sum`
-- ✅ Atualiza `config.yaml`, `README.md`, `CONTRIBUTING.md`
-- ✅ Atualiza arquivos Docker e GitHub Actions
-- ✅ Roda `go mod tidy` automaticamente
-- ✅ Regenera código (`make generate`)
-- ✅ Cria backup automático (git stash)
+- Atualiza todos os imports Go (`github.com/owner/project`)
+- Atualiza `go.mod` e `go.sum`
+- Atualiza `config.yaml`, `README.md`, `CONTRIBUTING.md`
+- Atualiza arquivos Docker e GitHub Actions
+- Roda `go mod tidy` automaticamente
+- Regenera código (`make generate`)
+- Cria backup automático (git stash)
 
 **Rollback:** `git stash pop`
-
----
-
-## Production-Ready
-
-✅ HTTP Server Timeouts (Slowloris protection)
-✅ Request ID + Log Correlation
-✅ Circuit Breaker (OAuth, SMTP)
-✅ Dead Letter Queue
-✅ OpenTelemetry Tracing
-✅ Prometheus Metrics + Grafana
-✅ Structured Logging (slog)
-✅ Backup (Litestream + S3)
-✅ Health Checks
-
----
-
-## Links Úteis
-
-| Recurso | URL |
-|---------|-----|
-| **Wiki** | https://github.com/PauloHFS/goth.wiki |
-| Swagger | http://localhost:8080/swagger |
-| Health | http://localhost:8080/health |
-| Metrics | http://localhost:8080/metrics |
-| Grafana | http://localhost:3001 |
-| Tempo | http://localhost:3200 |
 
 ---
 
