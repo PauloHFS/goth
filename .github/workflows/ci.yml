@@ -1,0 +1,529 @@
+name: GOTH Stack CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Permissões necessárias para CodeQL e upload de SARIF
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install NPM dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Generate Code
+        run: |
+          echo "Generating templates..."
+          go tool templ generate
+          echo "Generating SQLC code..."
+          go tool sqlc generate
+          echo "Generating Swagger docs..."
+          go tool swag init -g internal/cmd/server.go
+          echo "Compiling CSS..."
+          npx @tailwindcss/cli@4.1.18 -i ./web/static/assets/css/input.css -o ./web/static/assets/styles.css --minify
+          echo "Code generation complete"
+
+      - name: Verify Generated Code (Drift Check)
+        run: |
+          echo "Checking for uncommitted generated files..."
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Error: Generated files are out of sync with committed code."
+            echo "Please run 'make generate' locally and commit the changes."
+            echo ""
+            echo "Changed files:"
+            git status --porcelain
+            echo ""
+            echo "Diff:"
+            git diff --stat
+            exit 1
+          fi
+          echo "✓ All generated files are up to date"
+          
+          # Verify templates exist
+          if [ ! -f "internal/view/pages/login_templ.go" ]; then
+            echo "Error: Templates not generated!"
+            ls -la internal/view/pages/
+            exit 1
+          fi
+          echo "✓ Templates generated successfully"
+
+      - name: Check Formatting
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+      - name: Golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+          args: --timeout=5m
+          install-mode: goinstall
+
+      - name: Vulnerability Check (govulncheck)
+        run: go tool govulncheck ./...
+
+      - name: Security Scan (gosec)
+        uses: securego/gosec@v2.22.2
+        with:
+          args: '-no-fail -fmt sarif -out results.sarif ./...'
+
+      - name: Upload SARIF to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: results.sarif
+
+      - name: Validate Swagger Spec
+        run: |
+          echo "Validating Swagger specification..."
+          go tool swag init -g internal/cmd/server.go
+          # Validate spec is valid JSON
+          if ! python3 -c "import json; json.load(open('docs/swagger.json'))" 2>/dev/null; then
+            echo "Error: Swagger spec is not valid JSON!"
+            exit 1
+          fi
+          echo "✓ Swagger spec is valid"
+
+      - name: Test Database Migration Rollback
+        run: |
+          echo "Testing database migration rollback..."
+          export APP_ENV=dev
+          export SESSION_SECRET=test-secret-for-ci
+          export PASSWORD_PEPPER=test-pepper-for-ci
+          export DATABASE_URL="./test_migration.db?_journal_mode=WAL"
+
+          # Run migrations up
+          echo "Running migrations up..."
+          go run -tags fts5 ./scripts/ops/migrate.go up sqlite3 ./test_migration.db
+
+          # Run migrations down (rollback)
+          echo "Running migrations down (rollback test)..."
+          go run -tags fts5 ./scripts/ops/migrate.go down sqlite3 ./test_migration.db
+
+          # Run migrations up again (verify re-application)
+          echo "Running migrations up again (verify re-application)..."
+          go run -tags fts5 ./scripts/ops/migrate.go up sqlite3 ./test_migration.db
+
+          # Check migration status
+          echo "Checking migration status..."
+          go run -tags fts5 ./scripts/ops/migrate.go status sqlite3 ./test_migration.db
+
+          # Cleanup
+          rm -f test_migration.db test_migration.db-wal test_migration.db-shm
+
+          echo "✓ Migration rollback test passed"
+
+      - name: Build Application
+        run: go build -tags fts5 -ldflags="-s -w" -v -o bin/goth ./cmd/api
+
+      - name: Security Headers Check
+        run: |
+          echo "Starting test server for security headers check..."
+          export APP_ENV=dev
+          export SESSION_SECRET=test-secret-for-ci
+          export PASSWORD_PEPPER=test-pepper-for-ci
+          mkdir -p storage
+
+          # Start server in background
+          ./bin/goth server &
+          SERVER_PID=$!
+
+          # Wait for server to start
+          echo "Waiting for server to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Server is ready!"
+              break
+            fi
+            sleep 1
+          done
+
+          # Check security headers
+          echo "Checking security headers..."
+          HEADERS=$(curl -sI http://localhost:8080/)
+          
+          ERRORS=0
+          
+          # Check Content-Security-Policy
+          if ! echo "$HEADERS" | grep -qi "Content-Security-Policy"; then
+            echo "❌ Missing: Content-Security-Policy header"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✓ Content-Security-Policy header present"
+          fi
+          
+          # Check X-Frame-Options
+          if ! echo "$HEADERS" | grep -qi "X-Frame-Options"; then
+            echo "❌ Missing: X-Frame-Options header"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✓ X-Frame-Options header present"
+          fi
+          
+          # Check X-Content-Type-Options
+          if ! echo "$HEADERS" | grep -qi "X-Content-Type-Options"; then
+            echo "❌ Missing: X-Content-Type-Options header"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✓ X-Content-Type-Options header present"
+          fi
+          
+          # Check Referrer-Policy
+          if ! echo "$HEADERS" | grep -qi "Referrer-Policy"; then
+            echo "❌ Missing: Referrer-Policy header"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✓ Referrer-Policy header present"
+          fi
+          
+          # Kill server
+          kill $SERVER_PID 2>/dev/null || true
+          
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Security headers check failed: $ERRORS missing headers"
+            exit 1
+          fi
+          
+          echo "✓ All security headers present"
+
+      - name: Install gotestfmt
+        run: go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
+
+      - name: Run Unit & Integration Tests
+        timeout-minutes: 15
+        run: go test -tags fts5 -race -json -coverprofile=coverage.txt ./internal/... 2>&1 | gotestfmt -hide successful-tests
+
+      - name: Build Application
+        run: go build -tags fts5 -ldflags="-s -w" -v -o bin/goth ./cmd/api
+
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goth-binary
+          path: bin/
+          retention-days: 5
+
+  e2e:
+    name: E2E Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install NPM dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Install gotestfmt
+        run: go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
+
+      - name: Install Playwright Browsers (Chromium only)
+        run: npx playwright@1.57.0 install chromium --with-deps
+
+      - name: Download Binary Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: goth-binary
+          path: bin/
+
+      - name: Make Binary Executable
+        run: chmod +x bin/goth
+
+      - name: Start Test Server
+        timeout-minutes: 5
+        run: |
+          echo "Starting test server..."
+          
+          # Disable rate limiting for E2E tests
+          export E2E_TEST=true
+          
+          export DUCKDB_ENABLED=false
+          mkdir -p storage
+          nohup ./bin/goth server > server.log 2>&1 &
+          SERVER_PID=$!
+          echo "Server PID: $SERVER_PID"
+          echo "Waiting for server to start (max 30s)..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Server is ready!"
+              break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "Server process died! Logs:"
+              cat server.log
+              exit 1
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 1
+          done
+          echo "=== Server logs ==="
+          cat server.log
+          echo "=== End server logs ==="
+          echo "Checking server health..."
+          curl -f http://localhost:8080/health || (echo "Server failed to start" && cat server.log && exit 1)
+
+      - name: Run E2E Tests
+        timeout-minutes: 20
+        run: |
+          echo "Running E2E tests..."
+          
+          # Create test-results directory for screenshots
+          mkdir -p test-results/screenshots
+          mkdir -p test-results/videos
+          
+          set -o pipefail
+          go test -tags fts5 -race -v ./test/e2e/... 2>&1 | tee /tmp/e2e_output.txt
+          exit_code=${PIPESTATUS[0]}
+          
+          if [ $exit_code -ne 0 ]; then
+            echo "::error::E2E tests failed!"
+            echo "Check the test output above for details"
+            echo "Screenshots will be available in artifacts"
+            exit $exit_code
+          fi
+          
+          echo "E2E tests passed!"
+
+      - name: Upload E2E Artifacts (on failure or cancellation)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results/screenshots
+            test-results/videos
+          retention-days: 7
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: List Test Results
+        if: always()
+        run: |
+          echo "=== Test Results Directory ==="
+          ls -la test-results/ || echo "No test-results directory"
+          ls -la test-results/screenshots/ 2>/dev/null || echo "No screenshots directory"
+          ls -la test-results/videos/ 2>/dev/null || echo "No videos directory"
+
+      - name: Cleanup Test Server
+        if: always()
+        run: |
+          pkill -f "goth" || true
+
+  benchmark:
+    name: Performance Benchmarks
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Retry on failure to handle flaky benchmarks (DB locks, CI noise)
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+          cache: true
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Download Binary Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: goth-binary
+          path: bin/
+
+      - name: Make Binary Executable
+        run: chmod +x bin/goth
+
+      - name: Restore Golden Files Cache
+        id: cache-golden
+        uses: actions/cache@v4
+        with:
+          path: test/benchmarks/golden
+          key: ${{ runner.os }}-benchmark-golden-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-benchmark-golden-
+          fail-on-cache-miss: false
+
+      - name: Run Performance Benchmarks (Attempt 1)
+        id: bench_run_1
+        timeout-minutes: 15
+        continue-on-error: true
+        run: |
+          echo "Running benchmarks (attempt 1)..."
+          go test -tags fts5 -bench=. -benchmem -run=^# ./test/benchmarks/... 2>&1 | tee /tmp/bench_output_1.txt
+
+      - name: Run Performance Benchmarks (Attempt 2 - if first failed)
+        id: bench_run_2
+        timeout-minutes: 15
+        continue-on-error: true
+        if: failure() && steps.bench_run_1.outcome == 'failure'
+        run: |
+          echo "Running benchmarks (attempt 2)..."
+          go test -tags fts5 -bench=. -benchmem -run=^# ./test/benchmarks/... 2>&1 | tee /tmp/bench_output_2.txt
+
+      - name: Select Best Benchmark Results
+        run: |
+          # Use second run if first failed, otherwise use first
+          if [ -f /tmp/bench_output_2.txt ]; then
+            echo "Using benchmark results from attempt 2"
+            cp /tmp/bench_output_2.txt /tmp/bench_output.txt
+          elif [ -f /tmp/bench_output_1.txt ]; then
+            echo "Using benchmark results from attempt 1"
+            cp /tmp/bench_output_1.txt /tmp/bench_output.txt
+          else
+            echo "No benchmark results found!"
+            exit 1
+          fi
+
+      - name: Parse Benchmark Results
+        run: |
+          go run ./scripts/bench/benchmark-parse/main.go < /tmp/bench_output.txt > /tmp/bench_current.json
+
+      - name: Compare Against Baseline
+        id: compare
+        continue-on-error: true
+        run: |
+          echo "Comparing against baseline (threshold: 25%, skipping unstable benchmarks)..."
+          if [ -f "test/benchmarks/golden/golden_baseline.json" ]; then
+            go run ./scripts/bench/benchmark-compare/main.go \
+              --baseline test/benchmarks/golden/golden_baseline.json \
+              --current /tmp/bench_current.json \
+              --threshold 25 \
+              --normalize \
+              --skip-unstable \
+              --all > /tmp/bench_report.txt 2>&1 || true
+            echo "has_comparison=true" >> $GITHUB_OUTPUT
+            
+            # Check if hardware mismatch (check for specific text in report)
+            if grep -q "HARDWARE MISMATCH" /tmp/bench_report.txt; then
+              echo "⚠️ Hardware mismatch detected between baseline and CI"
+              echo "has_hardware_mismatch=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_hardware_mismatch=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No baseline found. Skipping comparison."
+            echo "has_comparison=false" >> $GITHUB_OUTPUT
+            echo "has_hardware_mismatch=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Benchmark Report
+        if: steps.compare.outputs.has_comparison == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: /tmp/bench_report.txt
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Comment PR with Results
+        if: github.event_name == 'pull_request' && steps.compare.outputs.has_comparison == 'true'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('/tmp/bench_report.txt', 'utf8');
+            const truncatedReport = report.substring(0, 65000);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 📊 Benchmark Results\n\n\`\`\`\n${truncatedReport}\n\`\`\``
+            });
+
+      - name: Fail on Regressions
+        if: steps.compare.outputs.has_comparison == 'true' && steps.compare.outputs.has_hardware_mismatch == 'false'
+        run: |
+          if grep -q "RESULT: FAILED" /tmp/bench_report.txt; then
+            echo "❌ Performance regressions detected!"
+            cat /tmp/bench_report.txt
+            exit 1
+          else
+            echo "✅ No performance regressions detected"
+          fi
+
+      - name: Hardware Mismatch Warning
+        if: steps.compare.outputs.has_hardware_mismatch == 'true'
+        run: |
+          echo "⚠️ Hardware mismatch detected between baseline and CI"
+          echo "Baseline and CI are running on different hardware"
+          echo "Consider updating the baseline on CI hardware for accurate comparison"
+          echo ""
+          cat /tmp/bench_report.txt
+          
+          # Still fail if there are regressions, but with a warning
+          if grep -q "RESULT: FAILED" /tmp/bench_report.txt; then
+            echo ""
+            echo "⚠️  WARNING: Regressions detected, but may be due to hardware differences"
+            echo "If these are false positives, update the baseline with:"
+            echo "  make bench-save"
+            echo "And commit the new baseline file"
+            exit 1
+          fi

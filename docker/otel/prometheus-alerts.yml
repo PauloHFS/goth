@@ -1,0 +1,270 @@
+# Prometheus Alert Rules para GOTH Stack
+
+groups:
+  - name: goth_alerts
+    interval: 30s
+    rules:
+      # ===========================================
+      # HTTP Errors
+      # ===========================================
+      - alert: GothHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) 
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alta taxa de erros HTTP no GOTH"
+          description: "Taxa de erros 5xx está em {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md"
+
+      - alert: GothHigh4xxRate
+        expr: |
+          sum(rate(http_requests_total{status=~"4.."}[5m])) 
+          / sum(rate(http_requests_total[5m])) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta taxa de erros 4xx no GOTH"
+          description: "Taxa de erros 4xx está em {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # ===========================================
+      # Latency
+      # ===========================================
+      - alert: GothHighLatency
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta latência no GOTH"
+          description: "Latência p99 está em {{ $value | humanize }}s (threshold: 1s)"
+
+      - alert: GothVeryHighLatency
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Latência muito alta no GOTH"
+          description: "Latência p99 está em {{ $value | humanize }}s (threshold: 5s)"
+
+      # ===========================================
+      # Worker / Jobs
+      # ===========================================
+      - alert: GothWorkerQueueBacklog
+        expr: worker_pending_jobs > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fila de workers acumulando"
+          description: "{{ $value }} jobs pendentes na fila"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#3-worker-queue-acumulando"
+
+      - alert: GothWorkerQueueCritical
+        expr: worker_pending_jobs > 5000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fila de workers crítica"
+          description: "{{ $value }} jobs pendentes na fila"
+
+      - alert: GothWorkerHighFailureRate
+        expr: |
+          sum(rate(worker_jobs_failed_total[5m])) 
+          / sum(rate(worker_jobs_processed_total[5m])) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta taxa de falha em jobs"
+          description: "{{ $value | humanizePercentage }} de jobs falhando"
+
+      - alert: GothStaleJobs
+        expr: |
+          count(
+            goth_job_age_seconds{status="processing"} > 300
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Jobs travados em processamento"
+          description: "{{ $value }} jobs processando há mais de 5 minutos"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#2-banco-de-dados-travado"
+
+      # ===========================================
+      # Database
+      # ===========================================
+      - alert: GothDBHighConnections
+        expr: db_connections_open > 40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alto número de conexões DB"
+          description: "{{ $value }} conexões abertas (threshold: 40)"
+
+      - alert: GothDBWALSize
+        expr: |
+          goth_db_wal_size_bytes > 104857600
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WAL do SQLite grande"
+          description: "WAL size: {{ $value | humanize1024 }}B (threshold: 100MB)"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#2-banco-de-dados-travado"
+
+      # ===========================================
+      # Disk Space
+      # ===========================================
+      - alert: GothLowDiskSpace
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/data"} 
+          / node_filesystem_size_bytes{mountpoint="/data"}) < 0.10
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pouco espaço em disco"
+          description: "Apenas {{ $value | humanizePercentage }} de espaço livre em /data"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#4-disco-cheio"
+
+      - alert: GothDiskSpaceWarning
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/data"} 
+          / node_filesystem_size_bytes{mountpoint="/data"}) < 0.20
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Espaço em disco baixo"
+          description: "{{ $value | humanizePercentage }} de espaço livre em /data"
+
+      # ===========================================
+      # Dead Letter Queue
+      # ===========================================
+      - alert: GothDLQGrowing
+        expr: increase(worker_jobs_dead_letter_total[1h]) > 10
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead Letter Queue crescendo"
+          description: "{{ $value }} jobs movidos para DLQ na última hora"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#6-dead-letter-queue-crescendo"
+
+      - alert: GothDLQCritical
+        expr: increase(worker_jobs_dead_letter_total[1h]) > 50
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Dead Letter Queue crítica"
+          description: "{{ $value }} jobs movidos para DLQ na última hora"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#6-dead-letter-queue-crescendo"
+
+      - alert: GothDLQHighFailureRate
+        expr: |
+          sum(rate(worker_jobs_failed_total[5m]))
+          / sum(rate(worker_jobs_processed_total[5m])) > 0.20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta taxa de falha em jobs"
+          description: "{{ $value | humanizePercentage }} de jobs falhando (threshold: 20%)"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#6-dead-letter-queue-crescendo"
+
+      # ===========================================
+      # Circuit Breaker
+      # ===========================================
+      - alert: GothCircuitBreakerOpen
+        expr: worker_circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker aberto"
+          description: "Circuit breaker para {{ $labels.job_type }} está aberto"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#5-circuit-breaker-aberto"
+
+      # ===========================================
+      # Auth / Business Metrics
+      # ===========================================
+      - alert: GothHighAuthFailureRate
+        expr: |
+          sum(rate(auth_logins_total{status="failure"}[5m])) 
+          / sum(rate(auth_logins_total[5m])) > 0.30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta taxa de falha em logins"
+          description: "{{ $value | humanizePercentage }} de logins falhando"
+
+      - alert: GothNoRegistrations
+        expr: increase(auth_registrations_total{status="success"}[1h]) == 0
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Nenhum registro em 1 hora"
+          description: "Nenhum registro bem-sucedido na última hora"
+
+      # ===========================================
+      # System
+      # ===========================================
+      - alert: GothHighMemoryUsage
+        expr: |
+          (go_memstats_alloc_bytes / go_memstats_sys_bytes) > 0.80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de memória alto"
+          description: "Memória em {{ $value | humanizePercentage }}"
+
+      - alert: GothHighGCPressure
+        expr: |
+          rate(go_gc_duration_seconds_sum[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alta pressão de GC"
+          description: "GC gastando {{ $value | humanize }}s por segundo"
+
+      # ===========================================
+      # Availability
+      # ===========================================
+      - alert: GothInstanceDown
+        expr: up{job="goth"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instância GOTH caída"
+          description: "Instância {{ $labels.instance }} está down"
+          runbook_url: "https://github.com/PauloHFS/goth/blob/main/docs/RUNBOOK.md#1-server-não-responde"
+
+      - alert: GothHealthCheckFailing
+        expr: |
+          probe_success{job="goth-health"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health check falhando"
+          description: "Health check falhou por {{ $value | duration }}"

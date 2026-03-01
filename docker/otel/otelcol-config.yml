@@ -1,0 +1,90 @@
+# ===========================================
+# OpenTelemetry Collector Configuration
+# ===========================================
+# Production configuration - routes data to Loki, Tempo, and Prometheus
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'goth-app'
+          static_configs:
+            - targets: ['app:8080']
+          metrics_path: '/metrics'
+          scrape_interval: 15s
+
+        - job_name: 'otel-collector'
+          static_configs:
+            - targets: ['otelcol:8889']
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1000
+    send_batch_max_size: 2000
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 500
+
+  # Add resource attributes
+  resource:
+    attributes:
+      - key: service.name
+        value: goth
+        action: insert
+
+exporters:
+  # Loki - Logs
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    tls:
+      insecure: true
+
+  # Tempo - Traces
+  tempo:
+    endpoint: http://tempo:4311
+    tls:
+      insecure: true
+
+  # Prometheus - Metrics
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: goth
+    const_labels:
+      service: goth
+      env: ${APP_ENV:-prod}
+
+  # Debug - print to console (disable in production!)
+  # debug:
+  #   verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [loki]
+
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [tempo]
+
+    metrics:
+      receivers: [prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  zpages:
+    endpoint: 0.0.0.0:55679

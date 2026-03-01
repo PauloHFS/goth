@@ -1,0 +1,55 @@
+run:
+  timeout: 5m
+  tests: false
+
+linters:
+  enable:
+    - errcheck
+    - unused
+    - ineffassign
+    - staticcheck
+    - gofmt
+    - govet
+    - typecheck
+  disable-all: false
+
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+  staticcheck:
+    checks:
+      - all
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    # Allow deprecated Playwright APIs in e2e tests (migration in progress)
+    - path: test/e2e/.*_test\.go
+      linters:
+        - staticcheck
+      text: "SA1019"
+    
+    # Allow errcheck for json.Encoder.Encode in handlers (response writing)
+    - path: internal/web/handlers\.go
+      linters:
+        - errcheck
+      text: "json\\.NewEncoder\\(w\\)\\.Encode"
+    
+    # Allow errcheck for fmt.Fprintf in error responses (best effort)
+    - path: internal/middleware/recovery\.go
+      linters:
+        - errcheck
+      text: "fmt\\.Fprintf\\(w, \"Internal Server Error\"\\)"
+    
+    # Allow errcheck for fmt.Fprint in broker (best effort response)
+    - path: internal/web/broker\.go
+      linters:
+        - errcheck
+      text: "fmt\\.Fprint\\(w, msg\\)"
+    
+    # Allow errcheck for fmt.Fprintf in server error responses
+    - path: internal/cmd/server\.go
+      linters:
+        - errcheck
+      text: "fmt\\.Fprintf\\(w, \"Low disk space\"\\)"

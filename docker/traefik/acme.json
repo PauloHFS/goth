@@ -1,0 +1,15 @@
+{
+  "letsencrypt": {
+    "Account": {
+      "Email": "paulohernane10@gmail.com",
+      "Registration": {
+        "body": {
+          "status": "valid"
+        }
+      },
+      "PrivateKey": "",
+      "KeyType": "4096"
+    },
+    "Certificates": []
+  }
+}

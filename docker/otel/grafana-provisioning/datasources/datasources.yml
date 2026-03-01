@@ -1,0 +1,37 @@
+apiVersion: 1
+
+datasources:
+  # Loki - Logs
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    jsonData:
+      manageAlerts: true
+      derivedFields:
+        - name: trace_id
+          matcherRegex: "trace_id=(\\w+)"
+          url: "$${$$(datasource:uuid)}/explore?panes=left:$${__value.raw}&right=bottom:$${__value.raw}&orgId=1"
+          datasourceUid: tempo
+
+  # Tempo - Traces
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:4311
+    jsonData:
+      httpAuthMethod: browser
+      tlsAuth: false
+      tracesToLogs:
+        datasourceUid: loki
+        tags: ['service.name', 'host']
+
+  # Prometheus - Metrics
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: false
+    jsonData:
+      timeInterval: "15s"

@@ -1,0 +1,103 @@
+# ===========================================
+# Traefik Dynamic Configuration
+# ===========================================
+# Middlewares and routing configuration
+# This file is hot-reloaded by Traefik
+#
+# For more options: https://doc.traefik.io/traefik/v3.0/middlewares/overview
+
+http:
+  # -------------------------------------------
+  # Rate Limiting
+  # -------------------------------------------
+  middlewares:
+    goth-rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Stricter rate limit for auth endpoints
+    goth-auth-rate-limit:
+      rateLimit:
+        average: 10
+        burst: 5
+        period: 1s
+
+  # -------------------------------------------
+  # Security Headers
+  # -------------------------------------------
+    goth-security:
+      headers:
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+          X-Content-Type-Options: "nosniff"
+
+  # -------------------------------------------
+  # Compression
+  # -------------------------------------------
+    goth-compress:
+      compress: {}
+
+  # -------------------------------------------
+  # Redirect HTTP to HTTPS
+  # -------------------------------------------
+    goth-redirecthttps:
+      redirectScheme:
+        scheme: https
+        permanent: true
+        port: "443"
+
+  # -------------------------------------------
+  # Circuit Breaker (for backend protection)
+  # -------------------------------------------
+    goth-circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.30"
+
+  # -------------------------------------------
+  # Retry
+  # -------------------------------------------
+    goth-retry:
+      retry:
+        attempts: 3
+        initialInterval: 100ms
+
+  # -------------------------------------------
+  # Metrics Authentication (BasicAuth)
+  # -------------------------------------------
+    metrics-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqNE8/"
+
+# TCP Routers (for WebSocket, etc.)
+tcp:
+  routers:
+    goth-ws:
+      rule: "HostSNI(`*`)"
+      service: goth-svc
+      entryPoints: websecure
+      tls: {}
+
+  services:
+    goth-svc:
+      loadBalancer:
+        servers:
+          - address: "app:8080"
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "5s"
+          followRedirects: true

@@ -1,0 +1,20 @@
+{
+  "global": {
+    "nosec": "enabled",
+    "audit": false
+  },
+  "exclude-rules": [
+    {
+      "path": "test/.*",
+      "rules": ["*"]
+    },
+    {
+      "path": "scripts/.*",
+      "rules": ["G204"]
+    },
+    {
+      "path": "internal/infrastructure/http/errors.go",
+      "rules": ["G101"]
+    }
+  ]
+}

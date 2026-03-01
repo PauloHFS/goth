@@ -1,0 +1,161 @@
+# ===========================================
+# GOTH Stack - Configuração Multi-Ambiente
+# ===========================================
+# Este arquivo define TODA a configuração estrutural da aplicação.
+# Segredos são injetados via variáveis de ambiente (.env).
+#
+# Ambientes disponíveis: dev, staging, prod
+# Selecione com: APP_ENV=dev (default)
+
+# -------------------------------------------
+# Configurações Globais (todos os ambientes)
+# -------------------------------------------
+defaults:
+  app_url: "http://localhost:8080"
+
+  asaas:
+    environment: "sandbox"  # sandbox ou production
+    webhook_token: "${ASAAS_WEBHOOK_TOKEN}"  # injetado via env
+    hmac_secret: "${ASAAS_HMAC_SECRET}"      # injetado via env
+
+  oauth:
+    google:
+      client_id: "${GOOGLE_CLIENT_ID}"       # injetado via env
+      client_secret: "${GOOGLE_CLIENT_SECRET}"  # injetado via env
+
+  monitoring:
+    health_check_interval: 30
+    metrics_interval: 15
+
+# -------------------------------------------
+# Ambientes
+# -------------------------------------------
+environments:
+  dev:
+    # Desenvolvimento local (APP_ENV=dev, default)
+    # Focado em debug e produtividade
+
+    server:
+      port: "8080"
+      read_timeout: 30
+      write_timeout: 30
+      read_header_timeout: 10
+      idle_timeout: 120
+
+    database:
+      url: "./goth.db?_journal_mode=WAL&_busy_timeout=5000"
+      max_open_conns: 50  # I/O bound workers
+      max_idle_conns: 10
+      conn_max_lifetime: 300
+
+    logging:
+      level: "debug"
+      format: "json"
+
+    session:
+      secret: "${SESSION_SECRET:-dev-secret-keep-it-simple-but-not-safe}"
+      lifetime_hours: 24
+
+    smtp:
+      host: "${SMTP_HOST:-localhost}"
+      port: "${SMTP_PORT:-1025}"
+      from: "noreply@localhost"
+      user: "${SMTP_USER}"
+      pass: "${SMTP_PASS}"
+
+    workers:
+      count: 0  # 0 = auto baseado em vCPUs
+      cpu_multiplier: 4.0  # 4x vCPUs para I/O bound
+      min_workers: 2
+      max_workers: 0  # 0 = auto (cpu * multiplier)
+
+    features:
+      swagger: true
+      metrics: true
+      profiling: false
+
+  staging:
+    # Ambiente de homologação (APP_ENV=staging)
+    # Espelha produção com dados de teste
+
+    server:
+      port: "8080"
+      read_timeout: 60
+      write_timeout: 60
+      read_header_timeout: 15
+      idle_timeout: 120
+
+    database:
+      url: "/data/goth.db?_journal_mode=WAL&_busy_timeout=5000"
+      max_open_conns: 25
+      max_idle_conns: 10
+      conn_max_lifetime: 300
+
+    logging:
+      level: "info"
+      format: "json"
+
+    session:
+      secret: "${SESSION_SECRET}"  # OBRIGATÓRIO
+      lifetime_hours: 168  # 7 dias
+
+    smtp:
+      host: "${SMTP_HOST}"
+      port: "${SMTP_PORT}"
+      from: "noreply@staging.goth.com"
+      user: "${SMTP_USER}"
+      pass: "${SMTP_PASS}"
+
+    workers:
+      count: 0
+      cpu_multiplier: 4.0
+      min_workers: 2
+      max_workers: 0
+
+    features:
+      swagger: false
+      metrics: true
+      profiling: true
+
+  prod:
+    # Produção (APP_ENV=prod)
+    # Otimizado para performance e segurança
+
+    server:
+      port: "8080"
+      read_timeout: 60
+      write_timeout: 60
+      read_header_timeout: 15
+      idle_timeout: 120
+
+    database:
+      url: "/data/goth.db?_journal_mode=WAL&_busy_timeout=5000"
+      max_open_conns: 50
+      max_idle_conns: 20
+      conn_max_lifetime: 600
+
+    logging:
+      level: "warn"
+      format: "json"
+
+    session:
+      secret: "${SESSION_SECRET}"  # OBRIGATÓRIO
+      lifetime_hours: 720  # 30 dias
+
+    smtp:
+      host: "${SMTP_HOST}"
+      port: "${SMTP_PORT}"
+      from: "noreply@goth.com"
+      user: "${SMTP_USER}"
+      pass: "${SMTP_PASS}"
+
+    workers:
+      count: 0
+      cpu_multiplier: 4.0
+      min_workers: 2
+      max_workers: 0
+
+    features:
+      swagger: false
+      metrics: true
+      profiling: false

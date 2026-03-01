@@ -1,0 +1,59 @@
+# Code Owners for Goth Stack
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for the entire repository
+* @PauloHFS
+
+# Core application code - requires owner review
+/internal/** @PauloHFS
+/cmd/** @PauloHFS
+
+# Database migrations - critical for data integrity
+/migrations/** @PauloHFS
+
+# SQL queries and database schema
+/sqlc/** @PauloHFS
+**/*.sql @PauloHFS
+
+# API and web handlers - security sensitive
+/internal/web/** @PauloHFS
+/internal/middleware/** @PauloHFS
+/internal/web/broker.go @PauloHFS
+
+# Authentication and authorization
+/internal/auth/** @PauloHFS
+/internal/session/** @PauloHFS
+
+# Configuration files
+/config.yaml @PauloHFS
+/.env.example @PauloHFS
+/litestream.yml @PauloHFS
+
+# CI/CD workflows - requires careful review
+/.github/workflows/** @PauloHFS
+
+# Security configurations
+/.gosec.json @PauloHFS
+/.github/CODEOWNERS @PauloHFS
+
+# Dependency management
+/go.mod @PauloHFS
+/go.sum @PauloHFS
+/package.json @PauloHFS
+/package-lock.json @PauloHFS
+
+# Docker configuration
+/Dockerfile* @PauloHFS
+/docker-compose*.yml @PauloHFS
+/.dockerignore @PauloHFS
+
+# Build and tooling configuration
+/Makefile @PauloHFS
+/.golangci.yml @PauloHFS
+/sqlc.yaml @PauloHFS
+/tailwind.config.js @PauloHFS
+
+# Documentation
+/README.md @PauloHFS
+/CONTRIBUTING.md @PauloHFS
+/docs/** @PauloHFS

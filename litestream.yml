@@ -1,0 +1,12 @@
+# ===========================================
+# Litestream Configuration
+# ===========================================
+# Continuous replication for SQLite database
+# Docs: https://litestream.io/
+
+dbs:
+  goth.db:
+    path: /data/goth.db
+    replicas:
+      - url: ${REPLICA_URL}
+        retention: ${REPLICA_RETENTION:-168h}  # 7 days default

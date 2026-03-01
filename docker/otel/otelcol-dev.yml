@@ -1,0 +1,42 @@
+# ===========================================
+# OpenTelemetry Collector - Development
+# ===========================================
+# Development configuration - prints to console only
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  # Debug exporter - prints to console
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133

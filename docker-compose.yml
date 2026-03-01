@@ -1,0 +1,224 @@
+services:
+  # ===========================================
+  # Traefik - Proxy Reverso & SSL
+  # ===========================================
+  traefik:
+    image: traefik:v3.1
+    container_name: goth-traefik
+    restart: unless-stopped
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_HTTPS_PORT:-443}:443"
+      # Dashboard - enable only in development!
+      - "${TRAEFIK_DASHBOARD_PORT:-8080}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/acme.json:/acme.json
+    environment:
+      - TZ=America/Sao_Paulo
+      # Traefik Dashboard credentials (change in production!)
+      - TRAEFIK_DASHBOARD_AUTH=${TRAEFIK_DASHBOARD_AUTH}
+    networks:
+      - goth-network
+    labels:
+      # Enable Traefik for this container
+      - "traefik.enable=true"
+      
+      # Dashboard (disable in production!)
+      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_DASHBOARD_HOST:-traefik.localhost}`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+
+  # ===========================================
+  # App - Aplicação Principal
+  # ===========================================
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      - APP_ENV=${APP_ENV:-prod}
+      - DATABASE_URL=/data/goth.db
+      - SESSION_SECRET=${SESSION_SECRET}
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - ASAAS_API_KEY=${ASAAS_API_KEY}
+      - ASAAS_ENVIRONMENT=${ASAAS_ENVIRONMENT:-sandbox}
+      - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
+      - ASAAS_HMAC_SECRET=${ASAAS_HMAC_SECRET}
+      # OpenTelemetry Configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-otelcol:4317}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-goth}
+    volumes:
+      - app-data:/data
+      - app-storage:/root/storage
+    networks:
+      - goth-network
+    labels:
+      - "traefik.enable=true"
+      
+      # HTTP Router (always available)
+      - "traefik.http.routers.goth-http.rule=Host(`${APP_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.goth-http.entrypoints=web"
+      - "traefik.http.routers.goth-http.middlewares=goth-redirecthttps"
+      
+      # HTTPS Router (with SSL)
+      - "traefik.http.routers.goth.rule=Host(`${APP_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.goth.entrypoints=websecure"
+      - "traefik.http.routers.goth.tls=true"
+      - "traefik.http.routers.goth.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.goth.middlewares=goth-security,goth-compress"
+      
+      # Backend service
+      - "traefik.http.services.goth.loadbalancer.server.port=8080"
+      - "traefik.http.services.goth.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.goth.loadbalancer.healthcheck.interval=30s"
+      - "traefik.http.services.goth.loadbalancer.healthcheck.timeout=10s"
+
+  # ===========================================
+  # Mailhog - Servidor de E-mail (Desenvolvimento)
+  # ===========================================
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: goth-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+    networks:
+      - goth-network
+    labels:
+      - "traefik.enable=true"
+
+  # ===========================================
+  # OpenTelemetry Collector
+  # ===========================================
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:${OTEL_VERSION:-0.100.0}
+    container_name: goth-otelcol
+    restart: unless-stopped
+    volumes:
+      - ./otel/otelcol-config.yml:/etc/otelcol-contrib/otelcol-config.yml:ro
+    command: --config /etc/otelcol-contrib/otelcol-config.yml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics
+      - "13133:13133" # Health check
+      - "55679:55679" # ZPages
+    environment:
+      - APP_ENV=${APP_ENV:-prod}
+    networks:
+      - goth-network
+
+  # ------------------------------------------
+  # Litestream - Backup contínuo (Production)
+  # ------------------------------------------
+  litestream:
+    image: litestream/litestream:latest
+    container_name: goth-litestream
+    restart: unless-stopped
+    volumes:
+      - app-data:/data
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+    command: replicate /data/goth.db ${REPLICA_URL}
+    profiles:
+      - prod
+    depends_on:
+      - app
+
+  # ------------------------------------------
+  # Grafana - Visualização
+  # ------------------------------------------
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION:-11.0.0}
+    container_name: goth-grafana
+    restart: unless-stopped
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=${GRAFANA_AUTH_ANONYMOUS:-false}
+      - GF_AUTH_DISABLE_LOGIN_FORM=${GRAFANA_AUTH_DISABLE_LOGIN:-false}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./otel/grafana-provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - goth-network
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+
+  # ------------------------------------------
+  # Loki - Logs
+  # ------------------------------------------
+  loki:
+    image: grafana/loki:${LOKI_VERSION:-3.0.0}
+    container_name: goth-loki
+    restart: unless-stopped
+    volumes:
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - goth-network
+
+  # ------------------------------------------
+  # Tempo - Traces
+  # ------------------------------------------
+  tempo:
+    image: grafana/tempo:${TEMPO_VERSION:-2.4.0}
+    container_name: goth-tempo
+    restart: unless-stopped
+    volumes:
+      - tempo-data:/var/tempo
+    ports:
+      - "4311:4311"   # OTLP gRPC
+      - "4312:4312"   # OTLP HTTP
+      - "3200:3200"   # Tempo API
+    networks:
+      - goth-network
+
+  # ------------------------------------------
+  # Prometheus - Metrics
+  # ------------------------------------------
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.52.0}
+    container_name: goth-prometheus
+    restart: unless-stopped
+    volumes:
+      - prometheus-data:/prometheus
+      - ./otel/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - goth-network
+
+networks:
+  goth-network:
+    driver: bridge
+
+volumes:
+  app-data:
+    driver: local
+  app-storage:
+    driver: local
+  grafana-data:
+    driver: local
+  loki-data:
+    driver: local
+  tempo-data:
+    driver: local
+  prometheus-data:
+    driver: local

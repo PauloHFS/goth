@@ -1,0 +1,407 @@
+{
+  "version": "2.0",
+  "timestamp": "2026-02-28T23:07:28Z",
+  "go_version": "go1.26.0",
+  "hardware": {
+    "goos": "linux",
+    "goarch": "amd64",
+    "num_cpu": 12,
+    "model": "Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz",
+    "fingerprint": "3fcd518c2c95b80d"
+  },
+  "reference_benchmark_ns": 5982,
+  "benchmarks": [
+    {
+      "name": "BenchmarkDashboardRendering",
+      "iterations": 37372,
+      "ns_per_op": 31150,
+      "mem_allocs_per_op": 52,
+      "mem_bytes_per_op": 5818,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkConcurrentWebhookIngestion",
+      "iterations": 3808,
+      "ns_per_op": 315331,
+      "mem_allocs_per_op": 178,
+      "mem_bytes_per_op": 5968,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkFTS5Search",
+      "iterations": 191226,
+      "ns_per_op": 5982,
+      "mem_allocs_per_op": 7,
+      "mem_bytes_per_op": 352,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPasswordHashing/Bcrypt-Cost",
+      "iterations": 16,
+      "ns_per_op": 69835250,
+      "mem_allocs_per_op": 9,
+      "mem_bytes_per_op": 5280,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPasswordHashing/Bcrypt-Cost",
+      "iterations": 4,
+      "ns_per_op": 265063120,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 5658,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPasswordHashing/Bcrypt-Cost",
+      "iterations": 1,
+      "ns_per_op": 1146196564,
+      "mem_allocs_per_op": 13,
+      "mem_bytes_per_op": 7176,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkSQLiteReadWriteStress",
+      "iterations": 91300,
+      "ns_per_op": 128802,
+      "mem_allocs_per_op": 67,
+      "mem_bytes_per_op": 2136,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkRequireAuthMiddleware",
+      "iterations": 77191,
+      "ns_per_op": 16205,
+      "mem_allocs_per_op": 44,
+      "mem_bytes_per_op": 7701,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkSessionLookup/ValidSession",
+      "iterations": 382008,
+      "ns_per_op": 3707,
+      "mem_allocs_per_op": 17,
+      "mem_bytes_per_op": 5620,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBroadcastScalability/10Clients-1User",
+      "iterations": 1000000,
+      "ns_per_op": 1125,
+      "mem_allocs_per_op": 3,
+      "mem_bytes_per_op": 56,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBroadcastScalability/100Clients-10Users",
+      "iterations": 527020,
+      "ns_per_op": 2067,
+      "mem_allocs_per_op": 2,
+      "mem_bytes_per_op": 56,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBroadcastScalability/1000Clients-100Users",
+      "iterations": 105763,
+      "ns_per_op": 12711,
+      "mem_allocs_per_op": 2,
+      "mem_bytes_per_op": 55,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBroadcastToUser",
+      "iterations": 1000000,
+      "ns_per_op": 1162,
+      "mem_allocs_per_op": 3,
+      "mem_bytes_per_op": 56,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkSSEClientRegistration/RegisterClient",
+      "iterations": 574887,
+      "ns_per_op": 2171,
+      "mem_allocs_per_op": 2,
+      "mem_bytes_per_op": 276,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkSSEClientRegistration/UnregisterClient",
+      "iterations": 1261254,
+      "ns_per_op": 977,
+      "mem_allocs_per_op": 0,
+      "mem_bytes_per_op": 0,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkInputValidation",
+      "iterations": 571581,
+      "ns_per_op": 1877,
+      "mem_allocs_per_op": 5,
+      "mem_bytes_per_op": 89,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPostPolicyChecks/Admin-CacheHit",
+      "iterations": 250526019,
+      "ns_per_op": 4.823,
+      "mem_allocs_per_op": 0,
+      "mem_bytes_per_op": 0,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPostPolicyChecks/Owner-CacheHit",
+      "iterations": 254324821,
+      "ns_per_op": 4.869,
+      "mem_allocs_per_op": 0,
+      "mem_bytes_per_op": 0,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPostPolicyChecks/NonOwner-CacheMiss",
+      "iterations": 270205785,
+      "ns_per_op": 4.597,
+      "mem_allocs_per_op": 0,
+      "mem_bytes_per_op": 0,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkUserAuthentication/GetUserByEmail",
+      "iterations": 152205,
+      "ns_per_op": 6718,
+      "mem_allocs_per_op": 12,
+      "mem_bytes_per_op": 544,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkUserAuthentication/GetUserByID",
+      "iterations": 191437,
+      "ns_per_op": 6539,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 432,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkTenantIsolation/Tenant-tenant-a",
+      "iterations": 141270,
+      "ns_per_op": 7616,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 640,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkTenantIsolation/Tenant-tenant-b",
+      "iterations": 152708,
+      "ns_per_op": 7767,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 640,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkTenantIsolation/Tenant-tenant-c",
+      "iterations": 138814,
+      "ns_per_op": 8390,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 640,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPaginationLargeDataset/Page",
+      "iterations": 146600,
+      "ns_per_op": 7433,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 648,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPaginationLargeDataset/Page",
+      "iterations": 164913,
+      "ns_per_op": 7399,
+      "mem_allocs_per_op": 11,
+      "mem_bytes_per_op": 656,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPaginationLargeDataset/Page",
+      "iterations": 164683,
+      "ns_per_op": 7550,
+      "mem_allocs_per_op": 11,
+      "mem_bytes_per_op": 656,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkPaginationLargeDataset/Page",
+      "iterations": 144817,
+      "ns_per_op": 7410,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 648,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkComponentRendering/Dashboard",
+      "iterations": 363853,
+      "ns_per_op": 3360,
+      "mem_allocs_per_op": 23,
+      "mem_bytes_per_op": 4579,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkTemplateWithLoops/10Items",
+      "iterations": 350110,
+      "ns_per_op": 3472,
+      "mem_allocs_per_op": 23,
+      "mem_bytes_per_op": 4579,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkTemplateWithLoops/50Items",
+      "iterations": 370758,
+      "ns_per_op": 3383,
+      "mem_allocs_per_op": 23,
+      "mem_bytes_per_op": 4579,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkTemplateWithLoops/100Items",
+      "iterations": 326460,
+      "ns_per_op": 3437,
+      "mem_allocs_per_op": 23,
+      "mem_bytes_per_op": 4579,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkReadWriteContention",
+      "iterations": 90136,
+      "ns_per_op": 13332,
+      "mem_allocs_per_op": 15,
+      "mem_bytes_per_op": 608,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkIdempotencyChecks/CheckIdempotency",
+      "iterations": 252822,
+      "ns_per_op": 4732,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 256,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBcryptCosts/Cost",
+      "iterations": 19,
+      "ns_per_op": 62133843,
+      "mem_allocs_per_op": 9,
+      "mem_bytes_per_op": 5233,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBcryptCosts/Cost",
+      "iterations": 4,
+      "ns_per_op": 256304250,
+      "mem_allocs_per_op": 10,
+      "mem_bytes_per_op": 5698,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBcryptCosts/Cost",
+      "iterations": 1,
+      "ns_per_op": 1037087892,
+      "mem_allocs_per_op": 11,
+      "mem_bytes_per_op": 6952,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBcryptCosts/Verify-Cost",
+      "iterations": 19,
+      "ns_per_op": 64940163,
+      "mem_allocs_per_op": 11,
+      "mem_bytes_per_op": 5220,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBcryptCosts/Verify-Cost",
+      "iterations": 4,
+      "ns_per_op": 253083617,
+      "mem_allocs_per_op": 11,
+      "mem_bytes_per_op": 5220,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkBcryptCosts/Verify-Cost",
+      "iterations": 2,
+      "ns_per_op": 984407966,
+      "mem_allocs_per_op": 11,
+      "mem_bytes_per_op": 5224,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkJobQueueOperations/CreateJob",
+      "iterations": 10000,
+      "ns_per_op": 118535,
+      "mem_allocs_per_op": 106,
+      "mem_bytes_per_op": 3727,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkJobQueueOperations/PickNextJob",
+      "iterations": 819,
+      "ns_per_op": 1367239,
+      "mem_allocs_per_op": 1101,
+      "mem_bytes_per_op": 38619,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkJobQueueOperations/CompleteJob",
+      "iterations": 8211,
+      "ns_per_op": 153321,
+      "mem_allocs_per_op": 117,
+      "mem_bytes_per_op": 3944,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkConcurrentJobProcessing",
+      "iterations": 468,
+      "ns_per_op": 2637309,
+      "mem_allocs_per_op": 30,
+      "mem_bytes_per_op": 1643,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkJobIdempotency/CreateJobWithIdempotencyKey",
+      "iterations": 10000,
+      "ns_per_op": 108937,
+      "mem_allocs_per_op": 112,
+      "mem_bytes_per_op": 3747,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkJobIdempotency/CheckProcessedJob",
+      "iterations": 214238,
+      "ns_per_op": 4982,
+      "mem_allocs_per_op": 11,
+      "mem_bytes_per_op": 264,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkZombieJobRecovery/GetStaleProcessingJobs",
+      "iterations": 700,
+      "ns_per_op": 1661343,
+      "mem_allocs_per_op": 34,
+      "mem_bytes_per_op": 1319,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkZombieJobRecovery/RecoverZombieJobs",
+      "iterations": 261,
+      "ns_per_op": 4282613,
+      "mem_allocs_per_op": 175,
+      "mem_bytes_per_op": 6798,
+      "timestamp": "2026-02-28T23:07:28Z"
+    },
+    {
+      "name": "BenchmarkJobPriorityScheduling/PickNextJob-FIFO",
+      "iterations": 555,
+      "ns_per_op": 2198098,
+      "mem_allocs_per_op": 30,
+      "mem_bytes_per_op": 1600,
+      "timestamp": "2026-02-28T23:07:28Z"
+    }
+  ]
+}

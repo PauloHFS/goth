@@ -1,0 +1,133 @@
+# ===========================================
+# Docker Compose - Development
+# ===========================================
+# Run with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# This adds only the OTel Collector (console output) for development
+
+services:
+  # ------------------------------------------
+  # OpenTelemetry Collector (Development)
+  # ------------------------------------------
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:${OTEL_VERSION:-0.100.0}
+    container_name: goth-otelcol-dev
+    volumes:
+      - ./otel/otelcol-dev.yml:/etc/otelcol-contrib/otelcol-config.yml:ro
+    command: --config /etc/otelcol-contrib/otelcol-config.yml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "13133:13133" # Health check
+    networks:
+      - goth-network
+    profiles:
+      - dev
+    environment:
+      - APP_ENV=dev
+
+  # ------------------------------------------
+  # Grafana (Development - Optional)
+  # ------------------------------------------
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION:-11.0.0}
+    container_name: goth-grafana-dev
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./otel/grafana-provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - goth-network
+    profiles:
+      - dev
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+
+  # ------------------------------------------
+  # Loki (Development - Optional)
+  # ------------------------------------------
+  loki:
+    image: grafana/loki:${LOKI_VERSION:-3.0.0}
+    container_name: goth-loki-dev
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+    networks:
+      - goth-network
+    profiles:
+      - dev
+
+  # ------------------------------------------
+  # Tempo (Development - Optional)
+  # ------------------------------------------
+  tempo:
+    image: grafana/tempo:${TEMPO_VERSION:-2.4.0}
+    container_name: goth-tempo-dev
+    ports:
+      - "4311:4311"   # OTLP gRPC
+      - "4312:4312"   # OTLP HTTP
+      - "3200:3200"   # Tempo API
+    volumes:
+      - tempo-data:/var/tempo
+    networks:
+      - goth-network
+    profiles:
+      - dev
+
+  # ------------------------------------------
+  # Prometheus (Development - Optional)
+  # ------------------------------------------
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.52.0}
+    container_name: goth-prometheus-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus-data:/prometheus
+      - ./otel/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - goth-network
+    profiles:
+      - dev
+
+  # ------------------------------------------
+  # Alertmanager (Development - Optional)
+  # ------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: goth-alertmanager-dev
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./otel/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./otel/alertmanager-templates:/etc/alertmanager/templates:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--cluster.listen-address='
+    networks:
+      - goth-network
+    profiles:
+      - dev
+    depends_on:
+      - prometheus
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - PAGERDUTY_SERVICE_KEY=${PAGERDUTY_SERVICE_KEY:-}
+      - ALERT_EMAIL=${ALERT_EMAIL:-}
+      - SMTP_HOST=${SMTP_HOST:-localhost}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+
+volumes:
+  grafana-data:
+  loki-data:
+  tempo-data:
+  prometheus-data:

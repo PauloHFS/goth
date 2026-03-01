@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Development
+.air.toml
+lefthook.yml
+.env
+.env.*
+!.env.example
+
+# Test coverage
+coverage.out
+*.out
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+test/integration/*.db
+test/benchmarks/*.db*
+
+# Benchmarks
+test/benchmarks/golden/
+
+# Profiles
+profiles/
+
+# Logs
+*.log
+traefik/logs/
+
+# Temporary
+tmp/
+temp/
+*.tmp

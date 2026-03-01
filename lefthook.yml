@@ -1,0 +1,60 @@
+# ===========================================
+# Lefthook Configuration
+# ===========================================
+# Fast and powerful Git hooks manager for Go projects
+# Docs: https://github.com/evilmartians/lefthook
+
+# Skip CI environment
+skip_output:
+  - meta
+  - success
+
+# Pre-commit: Run before each commit
+pre-commit:
+  parallel: false
+  commands:
+    # 1. Generate code (sqlc, templ)
+    generate:
+      run: make generate
+      stage_fixed: true
+
+    # 2. Format Go code
+    format:
+      run: gofmt -s -w .
+      stage_fixed: true
+
+    # 3. Run linter (only on staged files)
+    lint:
+      run: go tool golangci-lint run --fix
+      stage_fixed: true
+      interactive: true
+
+    # 4. Run short tests
+    test:
+      run: go test -tags fts5 -short ./internal/...
+      fail_text: "Tests failed! Please fix before committing."
+
+# Pre-push: Run before pushing to remote
+pre-push:
+  parallel: true
+  commands:
+    # 1. Security: Check for vulnerabilities
+    vuln-check:
+      run: go tool govulncheck ./...
+      fail_text: "Security vulnerabilities found!"
+
+    # 2. Run all tests with race detector
+    test:
+      run: go test -tags fts5 -race ./internal/... ./cmd/...
+      fail_text: "Tests failed! Push aborted."
+
+    # 3. Build check
+    build:
+      run: go build -o /dev/null ./...
+      fail_text: "Build failed! Push aborted."
+
+# Commit-msg: Validate commit message format (optional)
+# commit-msg:
+#   commands:
+#     conventional-commits:
+#       run: "grep -qE '^(feat|fix|docs|style|refactor|test|chore)[:(]' $1 || echo 'Invalid commit message format'"

@@ -1,0 +1,47 @@
+# ===========================================
+# Prometheus Configuration
+# ===========================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'goth'
+    environment: '${APP_ENV:-prod}'
+
+# Alert rules
+rule_files:
+  - 'prometheus-alerts.yml'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+      timeout: 10s
+      api_version: v2
+
+# Alertmanager (optional - configure if you want notifications)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # OTel Collector
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otelcol:8889']
+    metrics_path: '/metrics'
+
+  # Go Application
+  - job_name: 'goth'
+    static_configs:
+      - targets: ['app:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
