@@ -294,7 +294,8 @@ find . -type f -name "*.templ" ! -path "./vendor/*" ! -path "./.git/*" -exec sed
     "s/GOTH/${PROJECT_TITLE}/g" {} +
 find . -type f -name "*.templ" ! -path "./vendor/*" ! -path "./.git/*" -exec sed -i.bak \
     "s/goth/${PROJECT}/g" {} +
-find . -type f -name "*.templ" ! -path "./vendor/*" ! -path "./.git/*" -delete 2>/dev/null || true
+# Remover backups .bak dos arquivos .templ
+find . -type f -name "*.templ.bak" ! -path "./vendor/*" ! -path "./.git/*" -delete 2>/dev/null || true
 success "Templates Templ atualizados (${TEMPL_FILES} arquivos)"
 
 # ===========================================

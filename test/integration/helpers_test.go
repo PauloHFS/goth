@@ -14,14 +14,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PauloHFS/goth/internal/cmd"
 	"github.com/PauloHFS/goth/internal/db"
 	"github.com/PauloHFS/goth/internal/platform/config"
-	httpMiddleware "github.com/PauloHFS/goth/internal/platform/http/middleware"
 	"github.com/PauloHFS/goth/internal/platform/logging"
-	"github.com/PauloHFS/goth/internal/routes"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
-	"github.com/justinas/nosurf"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -69,13 +67,17 @@ func SetupTestServer(t *testing.T) {
 	if err != nil {
 		t.Logf("using default config: %v", err)
 		cfg = &config.Config{
-			Port:              "8099",
-			DatabaseURL:       TestDBPath,
-			SessionSecret:     "test-secret-key-for-integration-tests",
-			AppURL:            TestBaseURL,
-			AsaasAPIKey:       "test_asaas_key",
-			AsaasEnvironment:  "sandbox",
-			AsaasWebhookToken: "test_webhook_token",
+			Port:               "8099",
+			DatabaseURL:        TestDBPath,
+			SessionSecret:      "test-secret-key-for-integration-tests",
+			AppURL:             TestBaseURL,
+			AsaasAPIKey:        "test_asaas_key",
+			AsaasEnvironment:   "sandbox",
+			AsaasWebhookToken:  "test_webhook_token",
+			AsaasHmacSecret:    "test_hmac_secret",
+			GoogleClientID:     "",
+			GoogleClientSecret: "",
+			PasswordPepper:     "test-pepper",
 		}
 	}
 	testConfig = cfg
@@ -92,55 +94,20 @@ func SetupTestServer(t *testing.T) {
 	sessionMgr.Cookie.Secure = false
 	sessionMgr.Cookie.SameSite = http.SameSiteLaxMode
 
-	mux := http.NewServeMux()
-
-	web.RegisterRoutes(mux, web.HandlerDeps{
+	testServer = cmd.SetupTestServer(cmd.TestServerDeps{
 		DB:             testDB,
 		Queries:        testQueries,
 		SessionManager: sessionMgr,
 		Logger:         testLogger,
 		Config:         testConfig,
 	})
-
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
-
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("GOTH Stack Running"))
-	})
-
-	mux.Handle("POST "+routes.AsaasWebhook, featuresBilling.NewWebhookHandler(testQueries, testConfig.AsaasWebhookToken, "test_hmac_secret", testLogger))
-
-	csrfHandler := nosurf.New(mux)
-	csrfHandler.SetBaseCookie(http.Cookie{
-		HttpOnly: true,
-		Path:     "/",
-		Secure:   false,
-	})
-
-	// Rate limiting now handled by Traefik
-
-	handler := httpMiddleware.Recovery(
-		httpMiddleware.TenantExtractor("default")(
-			httpMiddleware.Logger(
-				httpMiddleware.Locale(
-					sessionMgr.LoadAndSave(
-						httpMiddleware.InjectCSRF(csrfHandler),
-					),
-				),
-			),
-		),
-	)
-
-	testServer = httptest.NewServer(handler)
 }
 
 func TeardownTestServer(t *testing.T) {
 	if testServer != nil {
 		testServer.Close()
 	}
+	cmd.ShutdownTestServer()
 }
 
 func TeardownTestDB(t *testing.T) {
@@ -225,13 +192,17 @@ func TestMain(m *testing.M) {
 	cfg, err := config.Load()
 	if err != nil {
 		cfg = &config.Config{
-			Port:              "8099",
-			DatabaseURL:       TestDBPath,
-			SessionSecret:     "test-secret-key-for-integration-tests",
-			AppURL:            TestBaseURL,
-			AsaasAPIKey:       "test_asaas_key",
-			AsaasEnvironment:  "sandbox",
-			AsaasWebhookToken: "test_webhook_token",
+			Port:               "8099",
+			DatabaseURL:        TestDBPath,
+			SessionSecret:      "test-secret-key-for-integration-tests",
+			AppURL:             TestBaseURL,
+			AsaasAPIKey:        "test_asaas_key",
+			AsaasEnvironment:   "sandbox",
+			AsaasWebhookToken:  "test_webhook_token",
+			AsaasHmacSecret:    "test_hmac_secret",
+			GoogleClientID:     "",
+			GoogleClientSecret: "",
+			PasswordPepper:     "test-pepper",
 		}
 	}
 	testConfig = cfg
@@ -249,10 +220,8 @@ func TestMain(m *testing.M) {
 	sessionMgr.Cookie.Secure = false
 	sessionMgr.Cookie.SameSite = http.SameSiteLaxMode
 
-	// Setup mux
-	mux := http.NewServeMux()
-
-	web.RegisterRoutes(mux, web.HandlerDeps{
+	// Setup test server using shared function
+	testServer = cmd.SetupTestServer(cmd.TestServerDeps{
 		DB:             testDB,
 		Queries:        testQueries,
 		SessionManager: sessionMgr,
@@ -260,51 +229,10 @@ func TestMain(m *testing.M) {
 		Config:         testConfig,
 	})
 
-	// Override health check for testing
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
-
-	mux.Handle("POST "+routes.AsaasWebhook, featuresBilling.NewWebhookHandler(testQueries, testConfig.AsaasWebhookToken, "test_hmac_secret", testLogger))
-
-	// Setup CSRF
-	// Disable CSRF for tests as it requires valid tokens that are impractical for automated tests
-	// In production, CSRF protection is enabled via the middleware chain in cmd/server.go
-	csrfHandler := nosurf.New(mux)
-	csrfHandler.SetBaseCookie(http.Cookie{
-		HttpOnly: true,
-		Path:     "/",
-		Secure:   false,
-	})
-	// Exempt all paths for testing purposes
-	csrfHandler.SetFailureHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip CSRF validation in tests
-		mux.ServeHTTP(w, r)
-	}))
-
-	// Initialize global broker for SSE
-	web.InitGlobalBroker()
-
-	// Rate limiting now handled by Traefik
-
-	// Build middleware chain - skip CSRF in tests
-	handler := httpMiddleware.Recovery(
-		httpMiddleware.TenantExtractor("default")(
-			httpMiddleware.Logger(
-				httpMiddleware.Locale(
-					sessionMgr.LoadAndSave(mux),
-				),
-			),
-		),
-	)
-
-	testServer = httptest.NewServer(handler)
-
-	// Cleanup in reverse order of initialization
+	// Cleanup
 	defer func() {
 		testServer.Close()
-		web.ShutdownGlobalBroker()
+		cmd.ShutdownTestServer()
 	}()
 
 	code := m.Run()
