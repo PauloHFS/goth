@@ -274,6 +274,32 @@ setup-tools:
 	@echo "Tools installed successfully!"
 
 # ===========================================
+# Rebranding
+# ===========================================
+rebrand:
+	@echo "Usage: make rebrand OWNER=<owner> PROJECT=<project> [DOMAIN=<domain>]"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make rebrand OWNER=mycompany PROJECT=myapp"
+	@echo "  make rebrand OWNER=john PROJECT=myproject DOMAIN=myproject.com"
+	@echo ""
+	@echo "This will:"
+	@echo "  - Update all Go imports"
+	@echo "  - Update go.mod and go.sum"
+	@echo "  - Update config.yaml, README.md, CONTRIBUTING.md"
+	@echo "  - Update Docker and GitHub Actions files"
+	@echo "  - Run go mod tidy"
+	@echo "  - Regenerate code (make generate)"
+	@echo ""
+	@echo "Rollback: git stash pop"
+	@echo ""
+	@if [ -z "$(OWNER)" ] || [ -z "$(PROJECT)" ]; then \
+		echo "Error: OWNER and PROJECT are required"; \
+		exit 1; \
+	fi
+	@./scripts/rebrand.sh $(OWNER) $(PROJECT) $(DOMAIN)
+
+# ===========================================
 # Lint
 # ===========================================
 lint:
@@ -326,6 +352,11 @@ help:
 	@echo "  make setup           - Install all tools and setup Traefik"
 	@echo "  make setup-tools     - Install development tools (golangci-lint, gosec, k6)"
 	@echo "  make setup-traefik   - Setup Traefik for development"
+	@echo ""
+	@echo "Rebranding:"
+	@echo "  make rebrand OWNER=<owner> PROJECT=<project> [DOMAIN=<domain>]"
+	@echo "                       - Rebrand boilerplate to your project"
+	@echo "                       - Ex: make rebrand OWNER=mycompany PROJECT=myapp"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate          - Run database migrations"
