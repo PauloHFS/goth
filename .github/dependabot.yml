@@ -1,114 +1,8 @@
 version: 2
 updates:
-  # Go modules - security and version updates
+  # Go modules - grouped updates with cooldown
   - package-ecosystem: "gomod"
     directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "PauloHFS"
-    assignees:
-      - "PauloHFS"
-    labels:
-      - "dependencies"
-      - "go"
-    commit-message:
-      prefix: "chore(deps)"
-      include: "scope"
-    groups:
-      go-security:
-        applies-to: security-updates
-        patterns:
-          - "*"
-      go-minor:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-    ignore:
-      # Ignore major version updates for critical dependencies until reviewed
-      - dependency-name: "golang.org/x/*"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "github.com/go-playground/validator/*"
-        update-types: ["version-update:semver-major"]
-
-  # GitHub Actions - security and version updates
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "PauloHFS"
-    assignees:
-      - "PauloHFS"
-    labels:
-      - "dependencies"
-      - "github-actions"
-      - "ci/cd"
-    commit-message:
-      prefix: "chore(ci)"
-      include: "scope"
-    groups:
-      actions-security:
-        applies-to: security-updates
-        patterns:
-          - "*"
-      actions-minor:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-
-  # NPM dependencies - security and version updates
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "PauloHFS"
-    assignees:
-      - "PauloHFS"
-    labels:
-      - "dependencies"
-      - "javascript"
-      - "frontend"
-    commit-message:
-      prefix: "chore(deps)"
-      include: "scope"
-    groups:
-      npm-security:
-        applies-to: security-updates
-        patterns:
-          - "*"
-      npm-minor:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-    ignore:
-      # Ignore major version updates for critical frontend dependencies
-      - dependency-name: "htmx.org"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "alpinejs"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@tailwindcss/*"
-        update-types: ["version-update:semver-major"]
-
-  # Docker dependencies - version updates for base images
-  - package-ecosystem: "docker"
-    directory: "/docker"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -119,7 +13,121 @@ updates:
       - "PauloHFS"
     labels:
       - "dependencies"
+      - "go"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      go-production:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      go-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    ignore:
+      # Defer major version updates for review
+      - dependency-name: "golang.org/x/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "github.com/go-playground/validator/*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions - grouped updates with cooldown
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "PauloHFS"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci/cd"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    groups:
+      actions-all:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+
+  # NPM dependencies - grouped updates with cooldown
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "PauloHFS"
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      npm-production:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    ignore:
+      # Defer major version updates for critical frontend dependencies
+      - dependency-name: "htmx.org"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "alpinejs"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@tailwindcss/*"
+        update-types: ["version-update:semver-major"]
+
+  # Docker dependencies - grouped updates
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "PauloHFS"
+    labels:
+      - "dependencies"
       - "docker"
     commit-message:
       prefix: "chore(docker)"
       include: "scope"
+    groups:
+      docker-all:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 5
