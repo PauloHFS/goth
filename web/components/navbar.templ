@@ -1,0 +1,105 @@
+package components
+
+import "github.com/PauloHFS/goth/internal/db"
+
+templ NavbarGuest() {
+	<div class="flex items-center gap-4">
+		<a href="/login" class="text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors">
+			Login
+		</a>
+		<a href="/register" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 transition-colors">
+			Sign Up
+		</a>
+		@ThemeToggle()
+	</div>
+}
+
+templ NavbarAuth(user db.User) {
+	<div class="flex items-center gap-2">
+		<nav class="hidden md:flex items-center gap-1">
+			<a href="/dashboard" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800 transition-colors">
+				Dashboard
+			</a>
+			<a href="/profile" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800 transition-colors">
+				Profile
+			</a>
+			<a href="/settings" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800 transition-colors">
+				Settings
+			</a>
+		</nav>
+		@ThemeToggle()
+		<div class="relative" x-data="{ open: false }">
+			<button 
+				@click="open = !open" 
+				@click.outside="open = false"
+				class="flex items-center gap-2 rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-zinc-800 transition-colors"
+			>
+				<div class="h-8 w-8 rounded-full bg-gray-200 dark:bg-zinc-700 flex items-center justify-center">
+					<span class="text-sm font-medium text-gray-600 dark:text-gray-300">
+						{ GetInitials("", user.Email) }
+					</span>
+				</div>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+				</svg>
+			</button>
+			<div 
+				x-show="open" 
+				x-transition 
+				x-cloak
+				class="absolute right-0 mt-2 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-zinc-900"
+			>
+				<div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+					<p class="text-sm font-medium text-gray-900 dark:text-white truncate">{ user.Email }</p>
+					<p class="text-xs text-gray-500 dark:text-gray-400 truncate">Member</p>
+				</div>
+				<a href="/dashboard" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800">
+					@LucideIcon("layout-dashboard", "h-4 w-4")
+					Dashboard
+				</a>
+				<a href="/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800">
+					@LucideIcon("user", "h-4 w-4")
+					Profile
+				</a>
+				<a href="/settings" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800">
+					@LucideIcon("settings", "h-4 w-4")
+					Settings
+				</a>
+				<a href="/notifications" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800">
+					@LucideIcon("bell", "h-4 w-4")
+					Notifications
+				</a>
+				<div class="border-t border-gray-200 dark:border-gray-700">
+					<form action="/logout" method="POST">
+						<input type="hidden" name="csrf_token" />
+						<button 
+							type="submit" 
+							class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+						>
+							@LucideIcon("log-out", "h-4 w-4")
+							Logout
+						</button>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+func GetInitials(name, email string) string {
+	if name != "" {
+		parts := []rune(name)
+		if len(parts) >= 2 {
+			return string(parts[0]) + string(parts[len(parts)-1])
+		}
+		return string(parts[0])
+	}
+	if email != "" {
+		parts := []rune(email)
+		if len(parts) >= 2 {
+			return string(parts[0]) + string(parts[1])
+		}
+		return string(parts[0])
+	}
+	return "?"
+}

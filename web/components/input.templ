@@ -1,0 +1,195 @@
+package components
+
+// Input creates a form input field
+templ Input(
+	label string,
+	name string,
+	inputType string,
+	placeholder string,
+	value string,
+	required bool,
+	disabled bool,
+	icon templ.Component,
+	helpText string,
+	errorText string,
+) {
+	<div>
+		if label != "" {
+			<label for={ name } class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+				{ label }
+			</label>
+		}
+
+		<div class="relative">
+			if icon != nil {
+				<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+					<span class="h-5 w-5 text-gray-400">@icon</span>
+				</div>
+				<input
+					type={ inputType }
+					id={ name }
+					name={ name }
+					value={ value }
+					placeholder={ placeholder }
+					required={ required }
+					disabled={ disabled }
+					class={
+						"block w-full pl-12 pr-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 " +
+						"focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 " +
+						"dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 " +
+						"dark:focus:border-white dark:focus:ring-white/20 transition-all " +
+						getErrorClass(errorText)
+					}
+				/>
+			} else {
+				<input
+					type={ inputType }
+					id={ name }
+					name={ name }
+					value={ value }
+					placeholder={ placeholder }
+					required={ required }
+					disabled={ disabled }
+					class={
+						"block w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 " +
+						"focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 " +
+						"dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 " +
+						"dark:focus:border-white dark:focus:ring-white/20 transition-all " +
+						getErrorClass(errorText)
+					}
+				/>
+			}
+		</div>
+
+		if helpText != "" && errorText == "" {
+			<p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{ helpText }</p>
+		}
+
+		if errorText != "" {
+			<p class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">{ errorText }</p>
+		}
+	</div>
+}
+
+func getErrorClass(errorText string) string {
+	if errorText != "" {
+		return "border-red-300 focus:border-red-500 focus:ring-red-500/20 dark:border-red-800"
+	}
+	return ""
+}
+
+// InputWithHX creates a form input field with HTMX attributes
+templ InputWithHX(
+	label string,
+	name string,
+	inputType string,
+	placeholder string,
+	value string,
+	required bool,
+	icon templ.Component,
+	hxGet string,
+	hxTarget string,
+	hxTrigger string,
+) {
+	<div>
+		if label != "" {
+			<label for={ name } class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+				{ label }
+			</label>
+		}
+
+		<div class="relative">
+			if icon != nil {
+				<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+					<span class="h-5 w-5 text-gray-400">@icon</span>
+				</div>
+				<input
+					type={ inputType }
+					id={ name }
+					name={ name }
+					value={ value }
+					placeholder={ placeholder }
+					required={ required }
+					class="block w-full pl-12 pr-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-white dark:focus:ring-white/20 transition-all"
+					hx-get={ hxGet }
+					hx-trigger={ hxTrigger }
+					hx-target={ hxTarget }
+					hx-push-url="true"
+				/>
+			} else {
+				<input
+					type={ inputType }
+					id={ name }
+					name={ name }
+					value={ value }
+					placeholder={ placeholder }
+					required={ required }
+					class="block w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-white dark:focus:ring-white/20 transition-all"
+					hx-get={ hxGet }
+					hx-trigger={ hxTrigger }
+					hx-target={ hxTarget }
+					hx-push-url="true"
+				/>
+			}
+		</div>
+	</div>
+}
+
+// TextArea creates a form textarea field
+templ TextArea(
+	label string,
+	name string,
+	placeholder string,
+	value string,
+	required bool,
+	rows int,
+	helpText string,
+	errorText string,
+) {
+	<div>
+		if label != "" {
+			<label for={ name } class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+				{ label }
+			</label>
+		}
+
+		<textarea
+			id={ name }
+			name={ name }
+			placeholder={ placeholder }
+			required={ required }
+			rows={ rows }
+			class={
+				"block w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 " +
+				"focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 " +
+				"dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 " +
+				"dark:focus:border-white dark:focus:ring-white/20 transition-all resize-none " +
+				getErrorClass(errorText)
+			}
+		>{ value }</textarea>
+
+		if helpText != "" && errorText == "" {
+			<p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{ helpText }</p>
+		}
+
+		if errorText != "" {
+			<p class="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">{ errorText }</p>
+		}
+	</div>
+}
+
+// Checkbox creates a form checkbox field
+templ Checkbox(label string, name string, checked bool, required bool) {
+	<label class="flex items-center">
+		<input
+			type="checkbox"
+			name={ name }
+			checked={ checked }
+			required={ required }
+			class="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 dark:border-gray-700 dark:bg-zinc-800 dark:text-white"
+		/>
+		if label != "" {
+			<span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{ label }</span>
+		}
+	</label>
+}

@@ -1,0 +1,90 @@
+package components
+
+// Button variants
+type ButtonVariant string
+
+const (
+	ButtonPrimary   ButtonVariant = "primary"
+	ButtonSecondary ButtonVariant = "secondary"
+	ButtonDanger    ButtonVariant = "danger"
+	ButtonGhost     ButtonVariant = "ghost"
+)
+
+// ButtonSize for different button sizes
+type ButtonSize string
+
+const (
+	ButtonSM ButtonSize = "sm"
+	ButtonMD ButtonSize = "md"
+	ButtonLG ButtonSize = "lg"
+)
+
+// Button creates a styled button
+templ Button(text string, variant ButtonVariant, size ButtonSize, disabled bool) {
+	<button
+		type="button"
+		class={ getButtonClass(variant, size) }
+		disabled={ disabled }
+	>
+		{ text }
+	</button>
+}
+
+func getButtonClass(variant ButtonVariant, size ButtonSize) string {
+	base := "inline-flex items-center justify-center font-medium rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed "
+
+	sizeClass := "px-4 py-2 text-sm"
+	switch size {
+	case ButtonSM:
+		sizeClass = "px-3 py-1.5 text-xs"
+	case ButtonLG:
+		sizeClass = "px-6 py-3 text-base"
+	}
+
+	variantClass := "bg-gray-900 text-white hover:bg-gray-800 focus:ring-gray-900 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 dark:focus:ring-white dark:focus:ring-offset-zinc-900"
+	switch variant {
+	case ButtonSecondary:
+		variantClass = "bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+	case ButtonDanger:
+		variantClass = "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 dark:focus:ring-offset-zinc-900"
+	case ButtonGhost:
+		variantClass = "bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-800"
+	}
+
+	return base + sizeClass + " " + variantClass
+}
+
+// SubmitButton creates a submit button
+templ SubmitButton(text string, variant ButtonVariant, size ButtonSize, disabled bool) {
+	<button
+		type="submit"
+		class={ getButtonClass(variant, size) }
+		disabled={ disabled }
+	>
+		{ text }
+	</button>
+}
+
+// IconButton creates an icon-only button
+templ IconButton(icon templ.Component, ariaLabel string, variant ButtonVariant) {
+	<button
+		type="button"
+		class={ getIconButtonClass(variant) }
+		aria-label={ ariaLabel }
+	>
+		@icon
+	</button>
+}
+
+func getIconButtonClass(variant ButtonVariant) string {
+	base := "inline-flex items-center justify-center p-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 "
+
+	switch variant {
+	case ButtonPrimary:
+		return base + "bg-gray-900 text-white hover:bg-gray-800 focus:ring-gray-900 dark:bg-white dark:text-gray-900"
+	case ButtonSecondary:
+		return base + "bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 dark:bg-gray-800 dark:text-gray-100"
+	default:
+		return base + "bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-800"
+	}
+}
