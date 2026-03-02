@@ -1,47 +1,70 @@
-# Git
-.git
-.gitignore
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+goth
+goth.test
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+node_modules/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
-# Documentation
-*.md
-!README.md
-docs/
+# OS
+.DS_Store
+Thumbs.db
 
-# Development
-.air.toml
-lefthook.yml
+# Environment
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
 
-# Test coverage
-coverage.out
-*.out
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
 
 # Database
 *.db
-*.db-wal
 *.db-shm
-test/integration/*.db
-test/benchmarks/*.db*
+*.db-wal
+storage/backups/
 
-# Benchmarks
-test/benchmarks/golden/
+# Coverage
+coverage.out
+coverage.html
 
-# Profiles
-profiles/
+# Build artifacts
+*.tar
+*.gz
 
-# Logs
-*.log
-traefik/logs/
+# Docker
+docker-compose.override.yml
 
-# Temporary
-tmp/
-temp/
-*.tmp
+# Playwright
+playwright-report/
+test-results/
+
+# Lighthouse
+lighthouse-report/
+
+# Test
+test/e2e/.auth/
