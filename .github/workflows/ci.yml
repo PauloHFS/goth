@@ -103,7 +103,7 @@ jobs:
         run: go tool govulncheck ./...
 
       - name: Security Scan (gosec)
-        uses: securego/gosec@v2.22.2
+        uses: securego/gosec@v2.24.7
         with:
           args: '-no-fail -fmt sarif -out results.sarif ./...'
 
