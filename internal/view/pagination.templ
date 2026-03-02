@@ -4,13 +4,25 @@ import "fmt"
 
 templ PaginationControls(p Pagination, baseURL string) {
 	if p.TotalPages() > 1 {
-		<div class="flex justify-center mt-4 space-x-2">
+		<div class="flex items-center justify-center gap-2 mt-4">
 			if p.HasPrevious() {
-				<a href={ templ.SafeURL(fmt.Sprintf("%s?page=%d", baseURL, p.PreviousPage())) } class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Anterior</a>
+				<a href={ templ.SafeURL(fmt.Sprintf("%s?page=%d", baseURL, p.PreviousPage())) } class="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700 transition-colors">
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+					</svg>
+					Anterior
+				</a>
 			}
-			<span class="px-4 py-2">Página { fmt.Sprintf("%d", p.CurrentPage) } de { fmt.Sprintf("%d", p.TotalPages()) }</span>
+			<span class="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400">
+				Página { fmt.Sprintf("%d", p.CurrentPage) } de { fmt.Sprintf("%d", p.TotalPages()) }
+			</span>
 			if p.HasNext() {
-				<a href={ templ.SafeURL(fmt.Sprintf("%s?page=%d", baseURL, p.NextPage())) } class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Próxima</a>
+				<a href={ templ.SafeURL(fmt.Sprintf("%s?page=%d", baseURL, p.NextPage())) } class="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700 transition-colors">
+					Próxima
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+					</svg>
+				</a>
 			}
 		</div>
 	}

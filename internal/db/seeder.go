@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"os"
 )
 
 func Seed(ctx context.Context, dbConn *sql.DB) error {
@@ -23,7 +24,14 @@ func Seed(ctx context.Context, dbConn *sql.DB) error {
 	}
 
 	// 3. Criar Usuário Admin (admin@admin.com / admin123)
-	hash, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+	// Usar pepper do ambiente para consistência com o login
+	pepper := os.Getenv("PASSWORD_PEPPER")
+	if pepper == "" {
+		pepper = "default-pepper-for-development-only"
+	}
+	passwordWithPepper := append([]byte("admin123"), []byte(pepper)...)
+	hash, _ := bcrypt.GenerateFromPassword(passwordWithPepper, bcrypt.DefaultCost)
+
 	_, err = queries.CreateUser(ctx, CreateUserParams{
 		TenantID:     "default",
 		Email:        "admin@admin.com",

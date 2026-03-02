@@ -83,7 +83,7 @@ func SetupTestServer(deps TestServerDeps) *httptest.Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	testCancel = cancel
 	testBroker = featuresSSE.NewBroker(ctx)
-	sseHandler := featuresSSE.NewHandler(testBroker)
+	sseHandler := featuresSSE.NewHandler(testBroker, deps.SessionManager)
 
 	// Setup mux
 	mux := http.NewServeMux()

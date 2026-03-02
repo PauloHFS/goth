@@ -11,9 +11,10 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"github.com/PauloHFS/goth/internal/db"
 	"github.com/PauloHFS/goth/internal/view"
+	"github.com/PauloHFS/goth/web/components"
 )
 
-func Base(title string, tenant db.Tenant) templ.Component {
+func Base(title string, tenant db.Tenant, user *db.User) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -34,33 +35,52 @@ func Base(title string, tenant db.Tenant) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"pt-br\"><head><title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"pt-BR\"><head><!-- Theme script MUST be first to prevent FOUC -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.ThemeScript().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.HeadComponent(
+			title,
+			"GOTH Stack - Minimalist Boilerplate",
+			"/images/og-default.png",
+			"https://goth.local",
+		).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<meta name=\"csrf-token\" content=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(view.CSRFToken(ctx))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/view/layout/base.templ`, Line: 13, Col: 16}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/view/layout/base.templ`, Line: 24, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><meta name=\"csrf-token\" content=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><!-- Styles --><link href=\"/assets/styles.css?v=6\" rel=\"stylesheet\"><!-- Scripts --><script src=\"/assets/js/htmx.min.js\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script defer src=\"/assets/js/alpine.min.js\"></script><script defer src=\"/static/js/app.js?v=2\"></script><!-- Lucide Icons (CDN) --><script src=\"https://unpkg.com/lucide@latest\"></script><style>\n\t    [x-cloak] { display: none !important; }\n\n\t    /* Minimalist scrollbar */\n\t    ::-webkit-scrollbar { width: 8px; height: 8px; }\n\t    ::-webkit-scrollbar-track { background: transparent; }\n\t    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }\n\t    .dark ::-webkit-scrollbar-thumb { background: #475569; }\n\t    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }\n\t    .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }\n\t  </style></head><body class=\"min-h-screen bg-white text-gray-900 antialiased dark:bg-zinc-950 dark:text-gray-100\"><!-- Skip Link --><a href=\"#main-content\" class=\"sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-gray-900 focus:px-4 focus:py-2 focus:text-white dark:focus:bg-white dark:focus:text-gray-900\">Skip to main content</a><!-- Header --><header class=\"sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm dark:border-gray-800 dark:bg-zinc-950/80\"><div class=\"mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8\"><a href=\"/\" class=\"flex items-center gap-2 text-lg font-semibold\"><div class=\"flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-white\"><span class=\"text-sm font-bold text-white dark:text-gray-900\">G</span></div><span class=\"text-gray-900 dark:text-white\">GOTH</span> <span class=\"text-gray-400\">Stack</span></a><!-- Dynamic Navbar based on auth state -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(view.CSRFToken(ctx))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/view/layout/base.templ`, Line: 14, Col: 55}
+		if user != nil {
+			templ_7745c5c3_Err = components.NavbarAuth(*user).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = components.NavbarGuest().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><script src=\"/assets/js/htmx.min.js\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script defer src=\"/assets/js/alpine.min.js\"></script><link href=\"/assets/styles.css\" rel=\"stylesheet\"><script>\n    document.body.addEventListener('htmx:configRequest', (event) => {\n      event.detail.headers['X-CSRF-Token'] = document.querySelector('meta[name=\"csrf-token\"]').content;\n    });\n  </script><style>\n    :root {\n      /* Exemplo: tenant.Settings deve ser parseado no middleware */\n      --color-primary: #3b82f6;\n      --color-bg: #ffffff;\n    }\n  </style></head><body class=\"bg-[var(--color-bg)] text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></header><!-- Main Content --><main id=\"main-content\" class=\"mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -68,7 +88,15 @@ func Base(title string, tenant db.Tenant) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</main><!-- Footer --><footer class=\"mt-auto border-t border-gray-200 py-6 dark:border-gray-800\"><div class=\"mx-auto max-w-7xl px-4 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6 lg:px-8\"><p>&copy; 2024 GOTH Stack. Built with Go, Templ, HTMX & Tailwind.</p></div></footer><!-- Toast Container -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.ToastContainer().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<!-- HTMX Config --><script>\n\t    document.body.addEventListener('htmx:configRequest', (event) => {\n\t      event.detail.headers['X-CSRF-Token'] = document.querySelector('meta[name=\"csrf-token\"]').content;\n\t    });\n\t  </script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

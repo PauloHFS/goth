@@ -3,36 +3,99 @@ package layout
 import (
 	"github.com/PauloHFS/goth/internal/db"
 	"github.com/PauloHFS/goth/internal/view"
+	"github.com/PauloHFS/goth/web/components"
 )
 
-templ Base(title string, tenant db.Tenant) {
-<!DOCTYPE html>
-<html lang="pt-br">
+templ Base(title string, tenant db.Tenant, user *db.User) {
+	<!DOCTYPE html>
+	<html lang="pt-BR">
 
-<head>
-  <title>{ title }</title>
-  <meta name="csrf-token" content={ view.CSRFToken(ctx) } />
-  <script src="/assets/js/htmx.min.js"></script>
-  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
-  <script defer src="/assets/js/alpine.min.js"></script>
-  <link href="/assets/styles.css" rel="stylesheet" />
-  <script>
-    document.body.addEventListener('htmx:configRequest', (event) => {
-      event.detail.headers['X-CSRF-Token'] = document.querySelector('meta[name="csrf-token"]').content;
-    });
-  </script>
-  <style>
-    :root {
-      /* Exemplo: tenant.Settings deve ser parseado no middleware */
-      --color-primary: #3b82f6;
-      --color-bg: #ffffff;
-    }
-  </style>
-</head>
+	<head>
+	  <!-- Theme script MUST be first to prevent FOUC -->
+	  @components.ThemeScript()
 
-<body class="bg-[var(--color-bg)] text-gray-900">
-  { children... }
-</body>
+	  @components.HeadComponent(
+	    title,
+	    "GOTH Stack - Minimalist Boilerplate",
+	    "/images/og-default.png",
+	    "https://goth.local",
+	  )
 
-</html>
+	  <meta name="csrf-token" content={ view.CSRFToken(ctx) } />
+
+	  <!-- Styles -->
+	  <link href="/assets/styles.css?v=6" rel="stylesheet" />
+
+	  <!-- Scripts -->
+	  <script src="/assets/js/htmx.min.js"></script>
+	  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+	  <script defer src="/assets/js/alpine.min.js"></script>
+	  <script defer src="/static/js/app.js?v=2"></script>
+
+	  <!-- Lucide Icons (CDN) -->
+	  <script src="https://unpkg.com/lucide@latest"></script>
+
+	  <style>
+	    [x-cloak] { display: none !important; }
+
+	    /* Minimalist scrollbar */
+	    ::-webkit-scrollbar { width: 8px; height: 8px; }
+	    ::-webkit-scrollbar-track { background: transparent; }
+	    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+	    .dark ::-webkit-scrollbar-thumb { background: #475569; }
+	    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+	    .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+	  </style>
+	</head>
+
+	<body class="min-h-screen bg-white text-gray-900 antialiased dark:bg-zinc-950 dark:text-gray-100">
+	  <!-- Skip Link -->
+	  <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-gray-900 focus:px-4 focus:py-2 focus:text-white dark:focus:bg-white dark:focus:text-gray-900">
+	    Skip to main content
+	  </a>
+
+	  <!-- Header -->
+	  <header class="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm dark:border-gray-800 dark:bg-zinc-950/80">
+	    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+	      <a href="/" class="flex items-center gap-2 text-lg font-semibold">
+	        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-white">
+	          <span class="text-sm font-bold text-white dark:text-gray-900">G</span>
+	        </div>
+	        <span class="text-gray-900 dark:text-white">GOTH</span>
+	        <span class="text-gray-400">Stack</span>
+	      </a>
+	      
+	      <!-- Dynamic Navbar based on auth state -->
+	      if user != nil {
+	        @components.NavbarAuth(*user)
+	      } else {
+	        @components.NavbarGuest()
+	      }
+	    </div>
+	  </header>
+
+	  <!-- Main Content -->
+	  <main id="main-content" class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+	    { children... }
+	  </main>
+
+	  <!-- Footer -->
+	  <footer class="mt-auto border-t border-gray-200 py-6 dark:border-gray-800">
+	    <div class="mx-auto max-w-7xl px-4 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6 lg:px-8">
+	      <p>&copy; 2024 GOTH Stack. Built with Go, Templ, HTMX & Tailwind.</p>
+	    </div>
+	  </footer>
+
+	  <!-- Toast Container -->
+	  @components.ToastContainer()
+
+	  <!-- HTMX Config -->
+	  <script>
+	    document.body.addEventListener('htmx:configRequest', (event) => {
+	      event.detail.headers['X-CSRF-Token'] = document.querySelector('meta[name="csrf-token"]').content;
+	    });
+	  </script>
+	</body>
+
+	</html>
 }
