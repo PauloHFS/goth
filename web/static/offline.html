@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline - GOTH App</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .container {
+        text-align: center;
+        color: white;
+        max-width: 500px;
+      }
+
+      .icon {
+        font-size: 80px;
+        margin-bottom: 20px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: scale(1.05);
+        }
+      }
+
+      h1 {
+        font-size: 32px;
+        margin-bottom: 16px;
+        font-weight: 700;
+      }
+
+      p {
+        font-size: 18px;
+        line-height: 1.6;
+        margin-bottom: 24px;
+        opacity: 0.9;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50px;
+        backdrop-filter: blur(10px);
+        margin-bottom: 24px;
+      }
+
+      .status-dot {
+        width: 12px;
+        height: 12px;
+        background: #ef4444;
+        border-radius: 50%;
+        animation: blink 1.5s ease-in-out infinite;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      .status.online .status-dot {
+        background: #10b981;
+        animation: none;
+      }
+
+      button {
+        background: white;
+        color: #667eea;
+        border: none;
+        padding: 16px 32px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .tips {
+        margin-top: 32px;
+        padding-top: 32px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .tips h3 {
+        font-size: 18px;
+        margin-bottom: 16px;
+        opacity: 0.9;
+      }
+
+      .tips ul {
+        text-align: left;
+        list-style: none;
+        padding: 0;
+      }
+
+      .tips li {
+        padding: 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0.8;
+      }
+
+      .tips li:before {
+        content: "💡";
+      }
+
+      .cached-pages {
+        margin-top: 24px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+      }
+
+      .cached-pages h4 {
+        font-size: 14px;
+        margin-bottom: 12px;
+        opacity: 0.8;
+      }
+
+      .cached-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      .cached-item {
+        padding: 8px 16px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">📡</div>
+
+      <div class="status" id="status">
+        <div class="status-dot"></div>
+        <span id="status-text">Você está offline</span>
+      </div>
+
+      <h1>Sem Conexão</h1>
+      <p>
+        Parece que você perdeu a conexão com a internet. Não se preocupe,
+        algumas páginas ainda estão disponíveis offline.
+      </p>
+
+      <button onclick="window.location.reload()">🔄 Tentar Novamente</button>
+
+      <div class="cached-pages" id="cached-pages">
+        <h4>📦 Páginas em Cache</h4>
+        <div class="cached-list" id="cached-list">
+          <div class="cached-item">Carregando...</div>
+        </div>
+      </div>
+
+      <div class="tips">
+        <h3>Dicas:</h3>
+        <ul>
+          <li>Verifique sua conexão Wi-Fi ou dados móveis</li>
+          <li>Páginas visitadas recentemente podem estar disponíveis</li>
+          <li>Ative o modo avião e desative para resetar a conexão</li>
+          <li>Seu progresso foi salvo automaticamente</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      // Check connection status
+      function updateStatus() {
+        const statusEl = document.getElementById("status");
+        const statusText = document.getElementById("status-text");
+
+        if (navigator.onLine) {
+          statusEl.classList.add("online");
+          statusText.textContent = "Conexão restaurada!";
+
+          // Auto-reload after 2 seconds
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } else {
+          statusEl.classList.remove("online");
+          statusText.textContent = "Você está offline";
+        }
+      }
+
+      // Listen for connection changes
+      window.addEventListener("online", updateStatus);
+      window.addEventListener("offline", updateStatus);
+
+      // Initial check
+      updateStatus();
+
+      // Load cached pages list
+      async function loadCachedPages() {
+        try {
+          const cacheNames = await caches.keys();
+          const allCached = [];
+
+          for (const cacheName of cacheNames) {
+            const cache = await caches.open(cacheName);
+            const requests = await cache.keys();
+
+            requests.forEach((request) => {
+              const url = new URL(request.url);
+              if (url.origin === window.location.origin) {
+                allCached.push(url.pathname);
+              }
+            });
+          }
+
+          const cachedList = document.getElementById("cached-list");
+
+          if (allCached.length > 0) {
+            cachedList.innerHTML = allCached
+              .slice(0, 10)
+              .map((path) => `<div class="cached-item">${path}</div>`)
+              .join("");
+
+            if (allCached.length > 10) {
+              cachedList.innerHTML += `<div class="cached-item">+${allCached.length - 10} mais</div>`;
+            }
+          } else {
+            cachedList.innerHTML =
+              '<div class="cached-item">Nenhuma página em cache</div>';
+          }
+        } catch (error) {
+          console.error("Failed to load cached pages:", error);
+        }
+      }
+
+      loadCachedPages();
+
+      // Register service worker if not already registered
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker
+          .register("/static/js/sw.js")
+          .then((registration) => {
+            console.log("SW registered:", registration);
+          })
+          .catch((error) => {
+            console.error("SW registration failed:", error);
+          });
+      }
+    </script>
+  </body>
+</html>
