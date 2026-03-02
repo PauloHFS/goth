@@ -1,0 +1,23 @@
+package pages
+
+import (
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view/layout"
+)
+
+templ Error500(user *db.User) {
+	@layout.Base("Erro Interno - GOTH Stack", db.Tenant{Name: "GOTH Stack"}, user) {
+		<div class="flex min-h-[calc(100vh-16rem)] items-center justify-center py-12">
+			<div class="text-center">
+				<h1 class="text-9xl font-bold text-gray-900 dark:text-white">500</h1>
+				<p class="mt-4 text-2xl font-semibold text-gray-600 dark:text-gray-400">Erro Interno do Servidor</p>
+				<p class="mt-2 text-gray-600 dark:text-gray-400">Algo deu errado nos nossos servidores. Tente novamente mais tarde.</p>
+				<div class="mt-8">
+					<a href="/" class="inline-flex items-center rounded-xl bg-gray-900 px-6 py-3 text-base font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 transition-colors">
+						Voltar para Home
+					</a>
+				</div>
+			</div>
+		</div>
+	}
+}

@@ -1,0 +1,110 @@
+package pages
+
+import (
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view/layout"
+	"github.com/PauloHFS/goth/web/components"
+)
+
+templ Contact(user *db.User) {
+	@layout.Base("Contact - GOTH Stack", db.Tenant{Name: "GOTH Stack"}, user) {
+		<div class="py-20">
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				<!-- Header -->
+				<div class="text-center mb-16">
+					<h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
+						Get in Touch
+					</h1>
+					<p class="mt-4 text-xl text-gray-600 dark:text-gray-400">
+						Have questions? We'd love to hear from you.
+					</p>
+				</div>
+
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+					<!-- Contact Form -->
+					<div class="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8">
+						<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Send us a message</h2>
+						<form class="space-y-6" action="/contact" method="POST">
+							<div>
+								<label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
+								<input type="text" id="name" name="name" required class="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-white dark:focus:ring-white/20 transition-all" placeholder="Your name">
+							</div>
+							<div>
+								<label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+								<input type="email" id="email" name="email" required class="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-white dark:focus:ring-white/20 transition-all" placeholder="you@example.com">
+							</div>
+							<div>
+								<label for="subject" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject</label>
+								<select id="subject" name="subject" class="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:focus:border-white dark:focus:ring-white/20 transition-all">
+									<option value="general">General Inquiry</option>
+									<option value="sales">Sales Question</option>
+									<option value="support">Technical Support</option>
+									<option value="partnership">Partnership</option>
+									<option value="other">Other</option>
+								</select>
+							</div>
+							<div>
+								<label for="message" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message</label>
+								<textarea id="message" name="message" rows="5" required class="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-white dark:focus:ring-white/20 transition-all" placeholder="How can we help you?"></textarea>
+							</div>
+							<button type="submit" class="w-full rounded-xl bg-gray-900 px-6 py-3 text-base font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 transition-colors">
+								Send Message
+							</button>
+						</form>
+					</div>
+
+					<!-- Contact Info -->
+					<div class="space-y-8">
+						<div class="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8">
+							<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Contact Information</h2>
+							<div class="space-y-4">
+								<div class="flex items-start gap-4">
+									<div class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800">
+										@components.LucideIcon("mail", "h-5 w-5 text-gray-900 dark:text-white")
+									</div>
+									<div>
+										<h3 class="font-semibold text-gray-900 dark:text-white">Email</h3>
+										<p class="text-gray-600 dark:text-gray-400">hello@gothstack.dev</p>
+									</div>
+								</div>
+								<div class="flex items-start gap-4">
+									<div class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800">
+										@components.LucideIcon("map-pin", "h-5 w-5 text-gray-900 dark:text-white")
+									</div>
+									<div>
+										<h3 class="font-semibold text-gray-900 dark:text-white">Location</h3>
+										<p class="text-gray-600 dark:text-gray-400">Remote-first, operating globally</p>
+									</div>
+								</div>
+								<div class="flex items-start gap-4">
+									<div class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-zinc-800">
+										@components.LucideIcon("clock", "h-5 w-5 text-gray-900 dark:text-white")
+									</div>
+									<div>
+										<h3 class="font-semibold text-gray-900 dark:text-white">Business Hours</h3>
+										<p class="text-gray-600 dark:text-gray-400">Monday - Friday, 9am - 6pm (UTC)</p>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8">
+							<h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Follow Us</h2>
+							<div class="flex gap-4">
+								<a href="#" class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors">
+									@components.LucideIcon("twitter", "h-5 w-5 text-gray-900 dark:text-white")
+								</a>
+								<a href="#" class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors">
+									@components.LucideIcon("github", "h-5 w-5 text-gray-900 dark:text-white")
+								</a>
+								<a href="#" class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors">
+									@components.LucideIcon("linkedin", "h-5 w-5 text-gray-900 dark:text-white")
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

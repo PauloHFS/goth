@@ -1,0 +1,111 @@
+package pages
+
+import (
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view/layout"
+	"github.com/PauloHFS/goth/web/components"
+)
+
+templ Admin(user *db.User) {
+	@layout.Base("Admin Dashboard - GOTH Stack", db.Tenant{Name: "GOTH Stack"}, user) {
+		<div class="py-8">
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				<!-- Header -->
+				<div class="mb-8">
+					<h1 class="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+					<p class="mt-2 text-gray-600 dark:text-gray-400">System overview and monitoring</p>
+				</div>
+
+				<!-- Stats Grid -->
+				<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+					<div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+						<div class="flex items-center">
+							<div class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+								@components.LucideIcon("users", "h-6 w-6 text-blue-600 dark:text-blue-400")
+							</div>
+							<div class="ml-4">
+								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
+								<p class="text-2xl font-semibold text-gray-900 dark:text-white" id="total-users">--</p>
+							</div>
+						</div>
+					</div>
+
+					<div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+						<div class="flex items-center">
+							<div class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+								@components.LucideIcon("check-circle", "h-6 w-6 text-green-600 dark:text-green-400")
+							</div>
+							<div class="ml-4">
+								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Active Sessions</p>
+								<p class="text-2xl font-semibold text-gray-900 dark:text-white" id="active-sessions">--</p>
+							</div>
+						</div>
+					</div>
+
+					<div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+						<div class="flex items-center">
+							<div class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
+								@components.LucideIcon("clock", "h-6 w-6 text-yellow-600 dark:text-yellow-400")
+							</div>
+							<div class="ml-4">
+								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Jobs</p>
+								<p class="text-2xl font-semibold text-gray-900 dark:text-white" id="pending-jobs">--</p>
+							</div>
+						</div>
+					</div>
+
+					<div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+						<div class="flex items-center">
+							<div class="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30">
+								@components.LucideIcon("alert-triangle", "h-6 w-6 text-red-600 dark:text-red-400")
+							</div>
+							<div class="ml-4">
+								<p class="text-sm font-medium text-gray-500 dark:text-gray-400">DLQ Jobs</p>
+								<p class="text-2xl font-semibold text-gray-900 dark:text-white" id="dlq-jobs">--</p>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Quick Links -->
+				<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+					<div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+						<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
+						<div class="space-y-3">
+							<a href="/admin/users" class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+								<span class="text-gray-700 dark:text-gray-300">Manage Users</span>
+								@components.LucideIcon("chevron-right", "h-5 w-5 text-gray-400")
+							</a>
+							<a href="/admin/dlq" class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+								<span class="text-gray-700 dark:text-gray-300">Dead Letter Queue</span>
+								@components.LucideIcon("chevron-right", "h-5 w-5 text-gray-400")
+							</a>
+							<a href="/admin/workers" class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+								<span class="text-gray-700 dark:text-gray-300">Worker Status</span>
+								@components.LucideIcon("chevron-right", "h-5 w-5 text-gray-400")
+							</a>
+						</div>
+					</div>
+
+					<div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+						<h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">System Health</h2>
+						<div class="space-y-4" id="system-health">
+							<div class="flex items-center justify-between">
+								<span class="text-gray-700 dark:text-gray-300">Database</span>
+								<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Checking...</span>
+							</div>
+							<div class="flex items-center justify-between">
+								<span class="text-gray-700 dark:text-gray-300">Cache</span>
+								<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Checking...</span>
+							</div>
+							<div class="flex items-center justify-between">
+								<span class="text-gray-700 dark:text-gray-300">Job Queue</span>
+								<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Checking...</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

@@ -1,0 +1,112 @@
+package pages
+
+import (
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view/layout"
+	"github.com/PauloHFS/goth/web/components"
+)
+
+templ Landing(user *db.User) {
+	@layout.Base("GOTH Stack - Modern Web Development", db.Tenant{Name: "GOTH Stack"}, user) {
+		<div class="relative overflow-hidden">
+			<!-- Hero Section -->
+			<section class="relative py-20 lg:py-32">
+				<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+					<div class="text-center">
+						<div class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-sm font-medium text-gray-600 dark:border-gray-800 dark:bg-zinc-900 dark:text-gray-400 mb-8">
+							<span class="flex h-2 w-2 rounded-full bg-green-500 mr-2"></span>
+							Now with HTMX & TailwindCSS
+						</div>
+						<h1 class="mx-auto max-w-4xl text-5xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl lg:text-7xl">
+							Build faster with
+							<span class="text-gray-900 dark:text-white"> GOTH Stack</span>
+						</h1>
+						<p class="mx-auto mt-6 max-w-2xl text-lg leading-8 text-gray-600 dark:text-gray-400">
+							A modern, minimalist full-stack framework combining Go, HTMX, and TailwindCSS. 
+							Build performant web applications with simplicity and elegance.
+						</p>
+						<div class="mt-10 flex items-center justify-center gap-x-6">
+							<a href="/register" class="rounded-xl bg-gray-900 px-8 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 transition-colors">
+								Get Started
+							</a>
+							<a href="/pricing" class="text-sm font-semibold leading-6 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+								View Pricing <span aria-hidden="true">→</span>
+							</a>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- Features Section -->
+			<section class="py-20 bg-gray-50 dark:bg-zinc-900/50">
+				<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+					<div class="text-center mb-16">
+						<h2 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
+							Everything you need to build
+						</h2>
+						<p class="mt-4 text-lg text-gray-600 dark:text-gray-400">
+							A complete solution for modern web development
+						</p>
+					</div>
+					<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+						<!-- Feature 1 -->
+						<div class="relative rounded-2xl border border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-zinc-900">
+							<div class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gray-900 dark:bg-white mb-6">
+								@components.LucideIcon("zap", "h-6 w-6 text-white dark:text-gray-900")
+							</div>
+							<h3 class="text-xl font-semibold text-gray-900 dark:text-white">Lightning Fast</h3>
+							<p class="mt-4 text-gray-600 dark:text-gray-400">
+								Built on Go for exceptional performance. HTMX brings interactivity without the JavaScript complexity.
+							</p>
+						</div>
+						<!-- Feature 2 -->
+						<div class="relative rounded-2xl border border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-zinc-900">
+							<div class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gray-900 dark:bg-white mb-6">
+								@components.LucideIcon("shield-check", "h-6 w-6 text-white dark:text-gray-900")
+							</div>
+							<h3 class="text-xl font-semibold text-gray-900 dark:text-white">Secure by Default</h3>
+							<p class="mt-4 text-gray-600 dark:text-gray-400">
+								Enterprise-grade security with 2FA, RBAC, CSRF protection, and secure session management built-in.
+							</p>
+						</div>
+						<!-- Feature 3 -->
+						<div class="relative rounded-2xl border border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-zinc-900">
+							<div class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gray-900 dark:bg-white mb-6">
+								@components.LucideIcon("layout-grid", "h-6 w-6 text-white dark:text-gray-900")
+							</div>
+							<h3 class="text-xl font-semibold text-gray-900 dark:text-white">Modern Stack</h3>
+							<p class="mt-4 text-gray-600 dark:text-gray-400">
+								TailwindCSS for beautiful UIs, SQLite for simplicity, and comprehensive API support out of the box.
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- CTA Section -->
+			<section class="py-20">
+				<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+					<div class="relative overflow-hidden rounded-3xl bg-gray-900 px-6 py-24 shadow-2xl sm:px-12 sm:py-32">
+						<div class="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"></div>
+						<div class="relative mx-auto max-w-2xl text-center">
+							<h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+								Ready to get started?
+							</h2>
+							<p class="mx-auto mt-6 max-w-xl text-lg leading-8 text-gray-300">
+								Join thousands of developers building faster, simpler web applications with GOTH Stack.
+							</p>
+							<div class="mt-10 flex items-center justify-center gap-x-6">
+								<a href="/register" class="rounded-xl bg-white px-8 py-3.5 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-100 transition-colors">
+									Start Building Free
+								</a>
+								<a href="/contact" class="text-sm font-semibold leading-6 text-white hover:text-gray-300 transition-colors">
+									Contact Sales <span aria-hidden="true">→</span>
+								</a>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+	}
+}
