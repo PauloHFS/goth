@@ -75,11 +75,12 @@ func RunServer(assetsFS embed.FS) error {
 	}
 
 	// Initialize OpenTelemetry tracing
+	// Nota: UseStdout=false pois os trace_id/span_id já aparecem nos logs via middleware Logger
 	tracingCfg := tracing.Config{
 		ServiceName: "goth",
 		Endpoint:    os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		Protocol:    os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"),
-		UseStdout:   cfg.Env == "dev",
+		UseStdout:   false,
 	}
 	if _, err := tracing.Init(tracingCfg); err != nil {
 		logger.Warn("failed to initialize tracing", "error", err)
@@ -118,7 +119,9 @@ func RunServer(assetsFS embed.FS) error {
 		_ = dbConn.Close()
 	}()
 
-	if err := os.MkdirAll("storage/avatars", 0755); err != nil {
+	// Create storage directories with secure permissions
+	// 0750: owner rwx, group rx, others none
+	if err := os.MkdirAll("storage/avatars", 0750); err != nil {
 		logger.Error("failed to create storage directories", "error", err)
 		return fmt.Errorf("failed to create storage directories: %w", err)
 	}
@@ -176,7 +179,7 @@ func RunServer(assetsFS embed.FS) error {
 	rbacEnforcer, err := rbac.NewEnforcerWithModel("storage/rbac/policy.csv")
 	if err != nil {
 		logger.Warn("failed to initialize RBAC, using fallback", "error", err)
-		rbacEnforcer, _ = rbac.NewEnforcerWithModel("")
+		rbacEnforcer = nil
 	} else {
 		if err := rbacEnforcer.InitializeDefaultRoles(); err != nil {
 			logger.Warn("failed to initialize default RBAC roles", "error", err)
@@ -451,12 +454,14 @@ func RunServer(assetsFS embed.FS) error {
 	// Middleware chain foca em segurança e observabilidade
 	handler := httpMiddleware.Recovery(
 		httpMiddleware.TenantExtractor("default")(
-			httpMiddleware.Logger(
-				httpMiddleware.Locale(
-					sessionManager.LoadAndSave(
-						httpMiddleware.RequestID( // Request ID antes do logger para correlation
-							httpMiddleware.SecurityHeaders(cfg.Env == "prod")( // Security headers
-								httpMiddleware.AddLoggerToContext(logger, csrfHandler),
+			httpMiddleware.Tracing( // Tracing antes do Logger para correlation de trace_id/span_id
+				httpMiddleware.Logger(
+					httpMiddleware.Locale(
+						sessionManager.LoadAndSave(
+							httpMiddleware.RequestID( // Request ID antes do logger para correlation
+								httpMiddleware.SecurityHeaders(cfg.Env == "prod")( // Security headers
+									httpMiddleware.AddLoggerToContext(logger, csrfHandler),
+								),
 							),
 						),
 					),
@@ -504,11 +509,22 @@ func RunServer(assetsFS embed.FS) error {
 	sseBroker.Shutdown()
 
 	// 5. Graceful HTTP shutdown with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Em desenvolvimento, timeout menor para evitar "address already in use" no air
+	shutdownTimeout := 5 * time.Second
+	if cfg.Env == "dev" {
+		shutdownTimeout = 2 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("server forced to shutdown", "error", err)
+		// Em dev, força o shutdown para liberar a porta rapidamente
+		if cfg.Env == "dev" {
+			ctxForce, cancelForce := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancelForce()
+			_ = srv.Shutdown(ctxForce)
+		}
 		return fmt.Errorf("server shutdown failed: %w", err)
 	}
 

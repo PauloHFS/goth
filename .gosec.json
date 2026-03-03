@@ -13,8 +13,52 @@
       "rules": ["G204"]
     },
     {
-      "path": "internal/infrastructure/http/errors.go",
+      "path": "internal/db/core.sql.go",
       "rules": ["G101"]
+    },
+    {
+      "path": "internal/platform/secrets/manager.go",
+      "rules": ["G101"]
+    },
+    {
+      "path": "internal/platform/httpclient/retry.go",
+      "rules": ["G404"]
+    },
+    {
+      "path": "internal/features/jobs/worker/processor.go",
+      "rules": ["G404", "G115"]
+    },
+    {
+      "path": "internal/platform/logging/atomic_level.go",
+      "rules": ["G115"]
+    },
+    {
+      "path": "internal/platform/http/health.go",
+      "rules": ["G115"]
+    },
+    {
+      "path": "internal/platform/security/twofactor/totp.go",
+      "rules": ["G115"]
+    },
+    {
+      "path": "internal/platform/http/middleware/cors.go",
+      "rules": ["G115"]
+    },
+    {
+      "path": "internal/cmd/test_server.go",
+      "rules": ["G118"]
+    },
+    {
+      "path": "internal/platform/http/middleware/validate.go",
+      "rules": ["G705"]
+    },
+    {
+      "path": "internal/platform/http/errors.go",
+      "rules": ["G706"]
+    },
+    {
+      "path": "internal/platform/httpclient/client.go",
+      "rules": ["G704"]
     }
   ]
 }

@@ -1,8 +1,8 @@
-# 🚀 GOTH Stack - Full-Stack Boilerplate
+# GOTH Stack - Full-Stack Boilerplate
 
 **Go + Templ + HTMX + Tailwind CSS**
 
-Um boilerplate full-stack moderno, minimalista e production-ready para desenvolvimento rápido de MVPs com escalabilidade imediata.
+A modern, minimalist, production-ready full-stack boilerplate for rapid MVP development with immediate scalability.
 
 [![CI/CD Pipeline](https://github.com/PauloHFS/goth/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/PauloHFS/goth/actions/workflows/ci-cd.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/PauloHFS/goth)](https://goreportcard.com/report/github.com/PauloHFS/goth)
@@ -11,72 +11,72 @@ Um boilerplate full-stack moderno, minimalista e production-ready para desenvolv
 
 ---
 
-## 📋 Índice
+## Table of Contents
 
-- [Features](#-features)
-- [Stack Tecnológico](#-stack-tecnológico)
-- [Quick Start](#-quick-start)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Desenvolvimento](#-desenvolvimento)
-- [Produção](#-produção)
-- [Testes](#-testes)
-- [Documentação](#-documentação)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Development](#development)
+- [Production](#production)
+- [Testing](#testing)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## ✨ Features
+## Features
 
 ### Core
-- ✅ **Go 1.25+** - Backend performático e type-safe
-- ✅ **Templ** - SSR components type-safe
-- ✅ **HTMX** - Interatividade sem JavaScript complexo
-- ✅ **Alpine.js** - JavaScript reativo leve
-- ✅ **Tailwind CSS v4** - Estilização utilitária
+- **Go 1.25+** - Performant and type-safe backend
+- **Templ** - Type-safe SSR components
+- **HTMX** - Interactivity without complex JavaScript
+- **Alpine.js** - Lightweight reactive JavaScript
+- **Tailwind CSS v4** - Utility-first styling
 
-### Segurança
-- ✅ **Autenticação OAuth2** (Google, GitHub)
-- ✅ **2FA/TOTP** - Autenticação de dois fatores
-- ✅ **RBAC** - Controle de acesso baseado em roles (Casbin)
-- ✅ **CSRF Protection** - Proteção contra CSRF attacks
-- ✅ **Session Timeout** - Timeout por inatividade
-- ✅ **CSP Headers** - Content Security Policy
+### Security
+- **OAuth2 Authentication** (Google, GitHub)
+- **2FA/TOTP** - Two-factor authentication
+- **RBAC** - Role-based access control (Casbin)
+- **CSRF Protection** - CSRF attack prevention
+- **Session Timeout** - Inactivity timeout
+- **CSP Headers** - Content Security Policy
 
-### Observabilidade
-- ✅ **OpenTelemetry** - Tracing distribuído
-- ✅ **Grafana** - Dashboards e métricas
-- ✅ **Loki** - Agregação de logs
-- ✅ **Tempo** - Armazenamento de traces
-- ✅ **Sentry** - Error tracking (frontend + backend)
-- ✅ **Web Vitals** - Performance monitoring
+### Observability
+- **OpenTelemetry** - Distributed tracing
+- **Grafana** - Dashboards and metrics
+- **Loki** - Log aggregation
+- **Tempo** - Trace storage
+- **Sentry** - Error tracking (frontend + backend)
+- **Web Vitals** - Performance monitoring
 
-### DX (Developer Experience)
-- ✅ **Taskfile** - Task runner unificado
-- ✅ **Hot Reload** (Air)
-- ✅ **golangci-lint** - Linting automatizado
-- ✅ **gosec** - Security scanning
-- ✅ **govulncheck** - Vulnerability checking
+### Developer Experience
+- **Taskfile** - Unified task runner
+- **Hot Reload** (Air)
+- **golangci-lint** - Automated linting
+- **gosec** - Security scanning
+- **govulncheck** - Vulnerability checking
 
 ### Production Ready
-- ✅ **Docker** - Containerização
-- ✅ **SQLite WAL** - Performance otimizada
-- ✅ **Litestream** - Backup contínuo S3
-- ✅ **Health Checks** - Monitoramento de saúde
-- ✅ **Graceful Shutdown** - Shutdown elegante
+- **Docker** - Containerization
+- **SQLite WAL** - Optimized performance
+- **Litestream** - Continuous S3 backup
+- **Health Checks** - Health monitoring
+- **Graceful Shutdown** - Elegant shutdown
 
 ---
 
-## 🛠️ Stack Tecnológico
+## Technology Stack
 
-| Categoria | Tecnologia | Versão |
-|-----------|------------|--------|
+| Category | Technology | Version |
+|----------|------------|---------|
 | **Backend** | Go | 1.25+ |
 | **Database** | SQLite (WAL, FTS5, FK) | 3.x |
 | **SSR** | Templ | 0.3.x |
-| **Interatividade** | HTMX | 2.x |
+| **Interactivity** | HTMX | 2.x |
 | **JavaScript** | Alpine.js | 3.x |
-| **Estilização** | Tailwind CSS | 4.x |
+| **Styling** | Tailwind CSS | 4.x |
 | **Auth** | OAuth2, 2FA/TOTP | - |
 | **RBAC** | Casbin | 2.x |
 | **Tracing** | OpenTelemetry | 1.x |
@@ -87,7 +87,7 @@ Um boilerplate full-stack moderno, minimalista e production-ready para desenvolv
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Pré-requisitos
 
@@ -204,6 +204,9 @@ task gen
 
 # Security scan
 task security:check
+
+# Or with make
+make sec
 
 # Database
 task db:migrate
@@ -324,6 +327,27 @@ task install:tools
 # Setup
 task setup
 ```
+
+### Running Checks
+
+```bash
+# Lint
+make lint
+
+# Security scan
+make sec
+
+# Tests
+make test
+
+# E2E tests (auto-starts server)
+make test-e2e
+
+# Build
+make build
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 

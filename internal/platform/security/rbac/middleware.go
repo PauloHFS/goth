@@ -230,14 +230,26 @@ func GetPermissionsHandler(enforcer *Enforcer) http.HandlerFunc {
 		}
 
 		// Write JSON response
-		w.Write([]byte(`{"permissions":`))
+		if _, err := w.Write([]byte(`{"permissions":`)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		// Simple JSON encoding (use proper JSON encoder in production)
 		for i, perm := range result {
 			if i > 0 {
-				w.Write([]byte(","))
+				if _, err := w.Write([]byte(",")); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
-			w.Write([]byte(`{"resource":"` + perm["resource"] + `","action":"` + perm["action"] + `"}`))
+			if _, err := w.Write([]byte(`{"resource":"` + perm["resource"] + `","action":"` + perm["action"] + `"}`)); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
-		w.Write([]byte(`}`))
+		if _, err := w.Write([]byte(`}`)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }

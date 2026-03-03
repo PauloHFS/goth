@@ -3,6 +3,7 @@ package logging
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -80,7 +81,8 @@ func saveLevelToFile(level string) error {
 	levelMu.Lock()
 	defer levelMu.Unlock()
 
-	return os.WriteFile(levelFilePath, []byte(level), 0644)
+	// Use 0600 for file permissions (owner rw only) - log level config is sensitive
+	return os.WriteFile(levelFilePath, []byte(level), 0600)
 }
 
 // loadLevelFromFile carrega o nível do arquivo
@@ -88,7 +90,13 @@ func loadLevelFromFile() error {
 	levelMu.RLock()
 	defer levelMu.RUnlock()
 
-	data, err := os.ReadFile(levelFilePath)
+	// Prevent path traversal attacks by cleaning the path
+	cleanPath := filepath.Clean(levelFilePath)
+	if !filepath.IsLocal(cleanPath) {
+		return fmt.Errorf("invalid log level file path")
+	}
+
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return err
 	}

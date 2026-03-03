@@ -1,8 +1,11 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,9 +14,10 @@ import (
 )
 
 const (
-	defaultServerURL = "http://localhost:8080"
-	testTimeout      = 30 * time.Second
-	maxRetries       = 2 // Retry flaky tests once
+	defaultServerURL     = "http://localhost:8080"
+	testTimeout          = 30 * time.Second
+	maxRetries           = 2 // Retry flaky tests once
+	serverStartupTimeout = 10 * time.Second
 )
 
 // ServerURL is the base URL for the test server.
@@ -21,9 +25,12 @@ const (
 var ServerURL string
 
 var (
-	pwInstance *pw.Playwright
-	browser    pw.Browser
-	pwOnce     bool
+	pwInstance   *pw.Playwright
+	browser      pw.Browser
+	pwOnce       bool
+	serverCmd    *exec.Cmd
+	serverCtx    context.Context
+	serverCancel context.CancelFunc
 )
 
 func init() {
@@ -35,6 +42,87 @@ func init() {
 	// Ensure test-results directories exist
 	os.MkdirAll("test-results/screenshots", 0755)
 	os.MkdirAll("test-results/videos", 0755)
+}
+
+// startServerIfNeeded starts the Go server if it's not already running
+func startServerIfNeeded(t *testing.T) {
+	// Check if server is already running
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(ServerURL + "/health")
+	if err == nil && resp.StatusCode == 200 {
+		resp.Body.Close()
+		t.Logf("Server already running at %s", ServerURL)
+		return
+	}
+
+	// Server not running, start it
+	t.Logf("Starting test server at %s...", ServerURL)
+
+	// Create context for server lifecycle
+	serverCtx, serverCancel = context.WithCancel(context.Background())
+
+	// Build server binary first
+	buildCmd := exec.CommandContext(serverCtx, "go", "build", "-o", "bin/goth-test", "./internal/cmd/api")
+	buildCmd.Env = append(os.Environ(), "GOENV=test")
+	if err := buildCmd.Run(); err != nil {
+		t.Fatalf("failed to build test server: %v", err)
+	}
+
+	// Start server
+	serverCmd = exec.CommandContext(serverCtx, "./bin/goth-test", "server")
+	serverCmd.Env = append(os.Environ(),
+		"GOENV=test",
+		"HTTP_ADDR=:8080",
+		"DB_PATH=./storage/test.db",
+	)
+	serverCmd.Stdout = nil // Suppress output during tests
+	serverCmd.Stderr = nil
+
+	if err := serverCmd.Start(); err != nil {
+		t.Fatalf("failed to start server: %v", err)
+	}
+
+	// Wait for server to be ready
+	if err := waitForServer(t, serverStartupTimeout); err != nil {
+		serverCancel()
+		t.Fatalf("server failed to start: %v", err)
+	}
+
+	t.Logf("Test server started successfully")
+}
+
+// waitForServer waits for the server to be responsive
+func waitForServer(t *testing.T, timeout time.Duration) error {
+	client := &http.Client{Timeout: 2 * time.Second}
+	start := time.Now()
+
+	for time.Since(start) < timeout {
+		resp, err := client.Get(ServerURL + "/health")
+		if err == nil && resp.StatusCode == 200 {
+			resp.Body.Close()
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("server did not start within %v", timeout)
+}
+
+// stopServer stops the test server if it was started by tests
+func stopServer(t *testing.T) {
+	if serverCancel != nil {
+		t.Logf("Stopping test server...")
+		serverCancel()
+		if serverCmd != nil && serverCmd.Process != nil {
+			// Force kill after graceful shutdown
+			serverCmd.Process.Kill()
+		}
+		// Clean up test database
+		os.Remove("./storage/test.db")
+		serverCmd = nil
+		serverCtx = nil
+		serverCancel = nil
+	}
 }
 
 // SetupPlaywright initializes a new Playwright browser instance and page.
@@ -214,4 +302,23 @@ func TeardownPlaywright() {
 		pwInstance = nil
 	}
 	pwOnce = false
+}
+
+// TestMain is the entry point for all E2E tests.
+// It handles server lifecycle (start/stop) and Playwright teardown.
+func TestMain(m *testing.M) {
+	// Start server before running tests
+	// Use a dummy testing.T for logging
+	dummyT := &testing.T{}
+	startServerIfNeeded(dummyT)
+
+	// Run all tests
+	exitCode := m.Run()
+
+	// Cleanup
+	stopServer(dummyT)
+	TeardownPlaywright()
+
+	// Exit with appropriate code
+	os.Exit(exitCode)
 }
