@@ -9,11 +9,6 @@ import (
 	"github.com/alexedwards/scs/v2"
 )
 
-// ContextKey para last activity
-type contextKey string
-
-const lastActivityKey contextKey = "last_activity"
-
 // SessionTimeoutConfig configura o timeout de sessão por inatividade
 type SessionTimeoutConfig struct {
 	// Timeout define o tempo máximo de inatividade

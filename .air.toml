@@ -6,3 +6,5 @@ tmp_dir = "tmp"
   exclude_dir = ["assets", "tmp", "vendor", "node_modules", "docs", "storage"]
   include_ext = ["go", "templ", "sql"]
   exclude_regex = ["_templ.go", "internal/db/.*\\.go", "docs/docs.go"]
+  kill = true
+  delay = 500

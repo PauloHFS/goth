@@ -114,7 +114,10 @@ func Handler(cfg *Config) http.HandlerFunc {
 			return
 		}
 
-		w.Write(data)
+		if _, err := w.Write(data); err != nil {
+			http.Error(w, "Failed to write sitemap", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -170,6 +173,9 @@ func RobotsHandler(cfg *Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("Cache-Control", "public, max-age=86400") // Cache for 24 hours
-		w.Write([]byte(robotsTxt))
+		if _, err := w.Write([]byte(robotsTxt)); err != nil {
+			http.Error(w, "Failed to write robots.txt", http.StatusInternalServerError)
+			return
+		}
 	}
 }

@@ -51,6 +51,9 @@ func (h *Handler) Subscribe(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
+	// Limit request body size to prevent memory exhaustion (max 1MB for form data)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
+
 	planValue := r.FormValue("plan_value")
 	billingType := r.FormValue("billing_type")
 

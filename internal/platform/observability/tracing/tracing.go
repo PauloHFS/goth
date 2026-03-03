@@ -47,11 +47,9 @@ func Init(cfg Config) (func(context.Context) error, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create stdout exporter: %w", err)
 		}
-	} else {
+	} else if cfg.Endpoint != "" {
+		// Only create OTLP exporter if endpoint is explicitly configured
 		endpoint := cfg.Endpoint
-		if endpoint == "" {
-			endpoint = "localhost:4317"
-		}
 
 		if cfg.Protocol == "http" {
 			exporter, err = otlptracehttp.New(ctx,
@@ -64,10 +62,10 @@ func Init(cfg Config) (func(context.Context) error, error) {
 				otlptracegrpc.WithInsecure(),
 			)
 		}
-	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
+		}
 	}
 
 	serviceName := cfg.ServiceName
@@ -95,11 +93,19 @@ func Init(cfg Config) (func(context.Context) error, error) {
 		sampler = sdktrace.TraceIDRatioBased(cfg.SampleRate)
 	}
 
-	tp = sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sampler),
-	)
+	// If no exporter configured, use noop provider (tracing still works for context propagation)
+	if exporter == nil {
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithResource(res),
+			sdktrace.WithSampler(sampler),
+		)
+	} else {
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(exporter),
+			sdktrace.WithResource(res),
+			sdktrace.WithSampler(sampler),
+		)
+	}
 
 	otel.SetTracerProvider(tp)
 	tracer = tp.Tracer(serviceName)
