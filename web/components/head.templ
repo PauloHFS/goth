@@ -1,0 +1,228 @@
+package components
+
+import "fmt"
+
+// BreadcrumbItem represents a breadcrumb item
+type BreadcrumbItem struct {
+	Name string
+	URL  string
+}
+
+// HeadProps represents the properties for the Head component
+type HeadProps struct {
+	Title       string
+	Description string
+	Image       string
+	URL         string
+	Type        string // website, article, profile, etc.
+	TwitterCard string // summary, summary_large_image, player, app
+	Canonical   string
+	NoIndex     bool
+	Extra       string // Additional meta tags or scripts
+}
+
+// HeadComponent provides dynamic meta tags for SEO and social sharing
+// Usage:
+//   @head("Dashboard - MyApp", "Manage your account", "/images/og-image.png")
+//   @headWithTitle("Profile", "MyApp")
+templ HeadComponent(title, description, image, url string) {
+	<title>{ title }</title>
+	
+	<!-- Basic Meta Tags -->
+	<meta name="description" content={ description } />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="color-scheme" content="light dark" />
+	
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={ url } />
+	<meta property="og:title" content={ title } />
+	<meta property="og:description" content={ description } />
+	<meta property="og:image" content={ image } />
+	
+	<!-- Twitter -->
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:url" content={ url } />
+	<meta name="twitter:title" content={ title } />
+	<meta name="twitter:description" content={ description } />
+	<meta name="twitter:image" content={ image } />
+	
+	<!-- Favicon -->
+	<link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+	<link rel="shortcut icon" href="/favicon.ico" />
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+	<link rel="manifest" href="/site.webmanifest" />
+	
+	<!-- Preconnect to external resources -->
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	
+	<!-- DNS prefetch for APIs -->
+	<link rel="dns-prefetch" href="https://www.google-analytics.com" />
+	
+	{ children... }
+}
+
+// HeadWithDefaults creates a Head with default values from the application
+// Usage:
+//   @headWithTitle("Dashboard", "MyApp")
+templ HeadWithTitle(title, appName string) {
+	@HeadComponent(
+		title + " - " + appName,
+		"Default description for " + appName,
+		"/images/og-default.png",
+		"https://" + appName + ".com",
+	) {
+		{ children... }
+	}
+}
+
+// HeadFull provides complete control over all meta tags
+templ HeadFull(
+	title, description, image, url, ogType, twitterCard, canonical string,
+	noIndex bool,
+) {
+	<title>{ title }</title>
+	
+	<!-- Basic Meta Tags -->
+	<meta name="description" content={ description } />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="color-scheme" content="light dark" />
+	
+	<!-- Robots -->
+	if noIndex {
+		<meta name="robots" content="noindex, nofollow" />
+	} else {
+		<meta name="robots" content="index, follow" />
+	}
+	
+	<!-- Canonical URL -->
+	if canonical != "" {
+		<link rel="canonical" href={ canonical } />
+	}
+	
+	<!-- Open Graph -->
+	<meta property="og:type" content={ ogType } />
+	<meta property="og:url" content={ url } />
+	<meta property="og:title" content={ title } />
+	<meta property="og:description" content={ description } />
+	<meta property="og:image" content={ image } />
+	<meta property="og:locale" content="pt_BR" />
+	<meta property="og:site_name" content="GOTH App" />
+	
+	<!-- Twitter -->
+	<meta name="twitter:card" content={ twitterCard } />
+	<meta name="twitter:url" content={ url } />
+	<meta name="twitter:title" content={ title } />
+	<meta name="twitter:description" content={ description } />
+	<meta name="twitter:image" content={ image } />
+	
+	<!-- Favicon -->
+	<link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+	<link rel="shortcut icon" href="/favicon.ico" />
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+	<link rel="manifest" href="/site.webmanifest" />
+	
+	{ children... }
+}
+
+// StructuredData adds JSON-LD structured data for rich search results
+// Usage:
+//   @structuredDataOrganization("MyApp", "https://myapp.com", "/logo.png")
+templ StructuredDataOrganization(name, url, logoURL string) {
+	<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@type": "Organization",
+			"name": name,
+			"url": url,
+			"logo": url + logoURL,
+			"sameAs": [
+				"https://twitter.com/myapp",
+				"https://github.com/myapp"
+			]
+		}
+	</script>
+}
+
+// StructuredDataProduct adds product structured data
+templ StructuredDataProduct(name, description, image, url, price, currency string) {
+	<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@type": "Product",
+			"name": name,
+			"description": description,
+			"image": image,
+			"url": url,
+			"offers": {
+				"@type": "Offer",
+				"price": price,
+				"priceCurrency": currency,
+				"availability": "https://schema.org/InStock"
+			}
+		}
+	</script>
+}
+
+// StructuredDataArticle adds article structured data
+templ StructuredDataArticle(headline, description, image, url, authorName, publishedDate string) {
+	<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@type": "Article",
+			"headline": headline,
+			"description": description,
+			"image": image,
+			"url": url,
+			"author": {
+				"@type": "Person",
+				"name": authorName
+			},
+			"datePublished": publishedDate,
+			"dateModified": publishedDate
+		}
+	</script>
+}
+
+// StructuredDataBreadcrumb adds breadcrumb structured data
+templ StructuredDataBreadcrumb(items []BreadcrumbItem) {
+	<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@type": "BreadcrumbList",
+			"itemListElement": [
+				for i, item := range items {
+					{
+						"@type": "ListItem",
+						"position": { i + 1 },
+						"name": { item.Name },
+						"item": { item.URL }
+					}
+				}
+			]
+		}
+	</script>
+}
+
+// MetaRobotsNoIndex adds a noindex meta tag
+templ MetaRobotsNoIndex() {
+	<meta name="robots" content="noindex, nofollow" />
+}
+
+// MetaRefresh redirects to another URL after a delay
+templ MetaRefresh(url string, delay int) {
+	<meta http-equiv="refresh" content={ fmt.Sprintf("%d;url=%s", delay, url) } />
+}
+
+// PreloadResource adds a preload link for critical resources
+templ PreloadResource(href, asType string) {
+	<link rel="preload" href={ href } as={ asType } crossorigin />
+}
+
+// PrefetchResource adds a prefetch link for next navigation
+templ PrefetchResource(href string) {
+	<link rel="prefetch" href={ href } as="document" />
+}

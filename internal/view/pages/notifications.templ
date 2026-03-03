@@ -1,0 +1,62 @@
+package pages
+
+import (
+	"time"
+	
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view/layout"
+)
+
+templ Notifications(user db.User, notifications []Notification) {
+	@layout.Base("Notificações - GOTH Stack", db.Tenant{Name: "GOTH Stack"}, &user) {
+		<div class="mx-auto max-w-3xl">
+			<div class="flex items-center justify-between">
+				<h1 class="text-3xl font-bold text-gray-900 dark:text-white">Notificações</h1>
+				<button type="button"
+					class="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
+					Marcar todas como lidas
+				</button>
+			</div>
+			
+			<div class="mt-8 space-y-4">
+				if len(notifications) == 0 {
+					<div class="rounded-xl bg-white dark:bg-zinc-900 shadow-sm border border-gray-200 dark:border-gray-800 p-12 text-center">
+						<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+						</svg>
+						<h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">Sem notificações</h3>
+						<p class="mt-2 text-gray-600 dark:text-gray-400">Quando você receber notificações, elas aparecerão aqui.</p>
+					</div>
+				} else {
+					for _, notification := range notifications {
+						<div class="rounded-xl bg-white dark:bg-zinc-900 shadow-sm border border-gray-200 dark:border-gray-800 p-4 transition-colors">
+							<div class="flex items-start gap-4">
+								<div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+									<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+								</div>
+								<div class="flex-1">
+									<h3 class="font-medium text-gray-900 dark:text-white">{ notification.Title }</h3>
+									<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{ notification.Message }</p>
+									<p class="mt-2 text-xs text-gray-500 dark:text-gray-500">{ notification.CreatedAt.Format("01/01/2006 15:04") }</p>
+								</div>
+							</div>
+						</div>
+					}
+				}
+			</div>
+		</div>
+	}
+}
+
+// Notification represents a notification
+type Notification struct {
+	ID        int64
+	UserID    int64
+	Title     string
+	Message   string
+	Type      string // info, success, warning, error
+	Read      bool
+	CreatedAt time.Time
+}

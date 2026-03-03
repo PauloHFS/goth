@@ -50,15 +50,16 @@ type CSPConfig struct {
 // DefaultCSPConfig retorna uma CSP segura e compatível com HTMX
 func DefaultCSPConfig() CSPConfig {
 	return CSPConfig{
-		// HTMX requer 'unsafe-inline' para scripts inline
-		// 'wasm-unsafe-eval' permite WebAssembly de forma segura
-		ScriptSrc: []string{"'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"},
+		// HTMX e Alpine.js requerem 'unsafe-inline' para scripts inline
+		// 'unsafe-eval' é necessário para Alpine.js (expressões x-data)
+		// Em produção, considere usar nonces para maior segurança
+		ScriptSrc: []string{"'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://unpkg.com"},
 		// Estilos inline são comuns em SSR
 		StyleSrc: []string{"'self'", "'unsafe-inline'", "https://fonts.googleapis.com"},
 		// Imagens de múltiplas fontes
 		ImgSrc: []string{"'self'", "data:", "https:", "blob:"},
-		// Conexões para API externa e analytics
-		ConnectSrc: []string{"'self'", "https://*.googleapis.com"},
+		// Conexões para API externa, analytics e source maps
+		ConnectSrc: []string{"'self'", "https://*.googleapis.com", "https://unpkg.com"},
 		// Fonts do Google
 		FontSrc: []string{"'self'", "https://fonts.gstatic.com"},
 		// Bloqueia object/embed por segurança
@@ -243,8 +244,9 @@ func SecurityHeaders(isProd bool) func(http.Handler) http.Handler {
 				cspConfig.ConnectSrc = append(cspConfig.ConnectSrc, "http://localhost:*", "ws://localhost:*")
 			}
 
-			// Usar CSP com nonce se disponível
-			if nonce != "" {
+			// Em desenvolvimento, usar CSP sem nonce para simplificar
+			// Em produção, usar nonce para maior segurança
+			if nonce != "" && isProd {
 				w.Header().Set("Content-Security-Policy", BuildCSPHeaderWithNonce(cspConfig, nonce))
 			} else {
 				w.Header().Set("Content-Security-Policy", BuildCSPHeader(cspConfig))

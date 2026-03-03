@@ -21,6 +21,7 @@ import (
 	"github.com/PauloHFS/goth/internal/features/jobs"
 	"github.com/PauloHFS/goth/internal/features/jobs/worker"
 	featuresSSE "github.com/PauloHFS/goth/internal/features/sse"
+	featuresUser "github.com/PauloHFS/goth/internal/features/user"
 	"github.com/PauloHFS/goth/internal/platform/config"
 	featureflags "github.com/PauloHFS/goth/internal/platform/featureflags"
 	httpHandler "github.com/PauloHFS/goth/internal/platform/http"
@@ -30,7 +31,11 @@ import (
 	"github.com/PauloHFS/goth/internal/platform/observability/audit"
 	"github.com/PauloHFS/goth/internal/platform/observability/tracing"
 	"github.com/PauloHFS/goth/internal/platform/secrets"
+	"github.com/PauloHFS/goth/internal/platform/security/rbac"
+	sitemap "github.com/PauloHFS/goth/internal/platform/seo"
 	"github.com/PauloHFS/goth/internal/routes"
+	"github.com/PauloHFS/goth/internal/view/pages"
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/justinas/nosurf"
@@ -133,7 +138,7 @@ func RunServer(assetsFS embed.FS) error {
 
 	sseBroker := featuresSSE.NewBroker(workerCtx)
 	defer sseBroker.Shutdown()
-	sseHandler := featuresSSE.NewHandler(sseBroker)
+	sseHandler := featuresSSE.NewHandler(sseBroker, sessionManager)
 
 	w := worker.New(cfg, dbConn, queries, logger, sseBroker)
 	if err := w.RescueZombies(workerCtx); err != nil {
@@ -166,6 +171,18 @@ func RunServer(assetsFS embed.FS) error {
 	// Audit logging
 	auditRepo := audit.NewRepository(dbConn)
 	auditLogger := audit.NewAuthAuditLogger(auditRepo)
+
+	// Feature: RBAC
+	rbacEnforcer, err := rbac.NewEnforcerWithModel("storage/rbac/policy.csv")
+	if err != nil {
+		logger.Warn("failed to initialize RBAC, using fallback", "error", err)
+		rbacEnforcer, _ = rbac.NewEnforcerWithModel("")
+	} else {
+		if err := rbacEnforcer.InitializeDefaultRoles(); err != nil {
+			logger.Warn("failed to initialize default RBAC roles", "error", err)
+		}
+		logger.Info("RBAC initialized", "roles", []string{"admin", "user", "billing", "moderator"})
+	}
 
 	// Feature: Auth
 	authUserRepo := featuresAuth.NewRepository(dbConn)
@@ -214,11 +231,144 @@ func RunServer(assetsFS embed.FS) error {
 	// ============================================================
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assetsFS))))
+
+	// Assets with proper Content-Type
+	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/assets/")
+		fullPath := "web/static/assets/" + path
+
+		// Serve CSS with correct Content-Type
+		if strings.HasSuffix(path, ".css") {
+			w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		}
+
+		http.ServeFile(w, r, fullPath)
+	})))
 	mux.Handle("GET /storage/", http.StripPrefix("/storage/", http.FileServer(http.Dir("storage"))))
+
+	// Static files with proper Content-Type and cache control
+	mux.HandleFunc("GET /static/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/static/")
+		fullPath := "web/static/" + path
+		http.ServeFile(w, r, fullPath)
+
+		// Set correct Content-Type for JS files
+		if strings.HasSuffix(path, ".js") {
+			w.Header().Set("Content-Type", "application/javascript")
+			// Prevent caching during development
+			if cfg.Env != "prod" {
+				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			}
+		}
+	})
+
 	mux.Handle("GET /metrics", promhttp.Handler())
 	mux.Handle("GET /events", sseHandler)
 	mux.Handle("GET /swagger/", httpSwagger.WrapHandler)
+
+	// SEO e PWA routes
+	sitemapCfg := sitemap.DefaultConfig()
+	sitemapCfg.BaseURL = "https://goth.local" // TODO: Configurar via ENV
+	mux.HandleFunc("GET /sitemap.xml", sitemap.Handler(sitemapCfg))
+	mux.HandleFunc("GET /robots.txt", sitemap.RobotsHandler(sitemapCfg))
+	mux.HandleFunc("GET /site.webmanifest", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/static/manifest.json")
+	})
+	mux.HandleFunc("GET /apple-touch-icon.png", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/static/apple-touch-icon.png")
+	})
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/static/favicon.ico")
+	})
+	mux.HandleFunc("GET /favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/static/favicon.svg")
+	})
+
+	// Public pages
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Landing(userPtr)).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /pricing", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Pricing(userPtr)).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /about", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.About(userPtr)).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /contact", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Contact(userPtr)).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /terms", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Terms(userPtr)).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /privacy", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Privacy(userPtr)).ServeHTTP(w, r)
+	})
+
+	// Error pages
+	mux.HandleFunc("GET /404", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Error404(userPtr)).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /500", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Error500(userPtr)).ServeHTTP(w, r)
+	})
+
+	// Admin pages
+	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.Admin(userPtr)).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("GET /admin/users", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := httpMiddleware.GetUser(r.Context())
+		var userPtr *db.User
+		if ok {
+			userPtr = &user
+		}
+		templ.Handler(pages.AdminUsers(userPtr)).ServeHTTP(w, r)
+	})
 
 	// Feature Flags routes
 	ffHandler.RegisterRoutes(mux)
@@ -266,12 +416,21 @@ func RunServer(assetsFS embed.FS) error {
 	mux.HandleFunc("GET /health", healthHandler.Health)
 	mux.HandleFunc("GET /ready", healthHandler.Ready)
 
+	// Cloud Native health endpoints (Kubernetes probes)
+	mux.HandleFunc("GET /healthz", healthHandler.Health)
+	mux.HandleFunc("GET /readyz", healthHandler.Ready)
+
 	// Rate limiting middleware apenas para endpoints críticos de auth
 	// (Traefik faz rate limiting global, este é uma camada extra de proteção)
 	authRateLimiter := httpMiddleware.RateLimitMiddleware(nil)
 
 	// Auth routes (registered after rate limiter is created)
 	authHandler.RegisterRoutes(mux, authRateLimiter)
+
+	// User routes (dashboard, profile)
+	userRepo := featuresUser.NewRepository(dbConn)
+	userHandler := featuresUser.NewHandler(userRepo, sessionManager, dbConn, queries)
+	userHandler.RegisterRoutes(mux)
 
 	// Middleware CSRF com injeção automática de token no contexto
 	// Em desenvolvimento (ENV=dev): bypass do Referer para localhost
@@ -283,7 +442,8 @@ func RunServer(assetsFS embed.FS) error {
 		csrf.SetBaseCookie(http.Cookie{
 			HttpOnly: true,
 			Path:     "/",
-			Secure:   cfg.Env == "prod", // Apenas HTTPS em produção
+			Secure:   cfg.Env == "prod",    // Apenas HTTPS em produção
+			SameSite: http.SameSiteLaxMode, // Permitir cookie em POST
 		})
 	}
 

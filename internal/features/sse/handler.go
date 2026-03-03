@@ -7,14 +7,19 @@ import (
 	"github.com/PauloHFS/goth/internal/contextkeys"
 	"github.com/PauloHFS/goth/internal/db"
 	httpErr "github.com/PauloHFS/goth/internal/platform/http"
+	"github.com/alexedwards/scs/v2"
 )
 
 type Handler struct {
-	broker Broker
+	broker  Broker
+	session *scs.SessionManager
 }
 
-func NewHandler(broker Broker) *Handler {
-	return &Handler{broker: broker}
+func NewHandler(broker Broker, session *scs.SessionManager) *Handler {
+	return &Handler{
+		broker:  broker,
+		session: session,
+	}
 }
 
 // ServeHTTP estabelece conexão SSE para notificações em tempo real
@@ -26,10 +31,17 @@ func NewHandler(broker Broker) *Handler {
 // @Failure 401 {object} map[string]string
 // @Router /events [get]
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Try to get user from context first (if auth middleware ran)
 	user, ok := r.Context().Value(contextkeys.UserContextKey).(db.User)
 	if !ok {
-		httpErr.HandleError(w, r, httpErr.NewUnauthorizedError(""), "sse_auth")
-		return
+		// Fallback: get user_id from session
+		userID := h.session.GetInt64(r.Context(), "user_id")
+		if userID == 0 {
+			httpErr.HandleError(w, r, httpErr.NewUnauthorizedError(""), "sse_auth")
+			return
+		}
+		// Create minimal user object
+		user = db.User{ID: userID}
 	}
 
 	w.Header().Set("Content-Type", "text/event-stream")

@@ -52,3 +52,12 @@ Thumbs.db
 # Storage
 storage/
 .env
+
+# Tailwind CLI
+tailwindcss-linux-x64
+
+# Test results
+test/e2e/test-results/
+
+# Client-side libs (removed from project)
+web/lib/

@@ -1,14 +1,17 @@
-module.exports = {
-  content: ["./internal/view/**/*.templ", "./internal/view/**/*.go"],
-  theme: {
-    extend: {
-      colors: {
-        primary: 'var(--color-primary)',
-        bg: 'var(--color-bg)',
-      }
-    }
-  },
-  plugins: [
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./**/*.templ",
+    "./**/*.go",
+    "./**/*.html",
+    "internal/view/**/*.templ",
+    "internal/view/**/*.go",
+    "web/**/*.templ",
+    "web/**/*.go",
+    "web/**/*.html"
   ],
+  theme: {
+    extend: {},
+  },
 }
-

@@ -1,0 +1,75 @@
+package components
+
+// Spinner creates a loading spinner
+templ Spinner(size string) {
+	<span class={ "inline-block animate-spin " + getSpinnerSize(size) }>
+		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+			<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+			<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+		</svg>
+	</span>
+}
+
+func getSpinnerSize(size string) string {
+	switch size {
+	case "sm":
+		return "h-4 w-4"
+	case "lg":
+		return "h-8 w-8"
+	default:
+		return "h-5 w-5"
+	}
+}
+
+// LoadingOverlay creates a full-page loading overlay
+templ LoadingOverlay(message string) {
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+		<div class="bg-white dark:bg-zinc-900 rounded-xl shadow-xl p-6 flex flex-col items-center gap-4">
+			@Spinner("lg")
+			if message != "" {
+				<p class="text-sm text-gray-600 dark:text-gray-400">{ message }</p>
+			}
+		</div>
+	</div>
+}
+
+// InlineSpinner creates an inline spinner (for buttons, etc)
+templ InlineSpinner(size string) {
+	<span class={ "inline-block animate-spin " + getSpinnerSize(size) }>
+		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+			<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+			<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+		</svg>
+	</span>
+}
+
+// Skeleton creates a skeleton loading placeholder
+templ Skeleton(width string, height string, rounded string) {
+	<div class={ "animate-pulse bg-gray-200 dark:bg-gray-700 " + width + " " + height + " " + rounded }></div>
+}
+
+// SkeletonText creates a skeleton text placeholder
+templ SkeletonText(lines int) {
+	<div class="space-y-2">
+		for i := 0; i < lines; i++ {
+			<div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-4 rounded w-3/4"></div>
+		}
+	</div>
+}
+
+// SkeletonCard creates a skeleton card placeholder
+templ SkeletonCard() {
+	<div class="bg-white dark:bg-zinc-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-6">
+		<div class="flex items-center gap-4">
+			<div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-12 w-12 rounded-full"></div>
+			<div class="flex-1 space-y-2">
+				<div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-4 rounded w-1/2"></div>
+				<div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-3 rounded w-1/3"></div>
+			</div>
+		</div>
+		<div class="mt-4 space-y-2">
+			<div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-3 rounded"></div>
+			<div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-3 rounded w-5/6"></div>
+		</div>
+	</div>
+}

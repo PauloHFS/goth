@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/PauloHFS/goth/internal/contextkeys"
 	"github.com/PauloHFS/goth/internal/db"
 )
 
@@ -49,10 +50,15 @@ func newRequest(method, url string, body io.Reader) *http.Request {
 	return req
 }
 
-type contextKey string
-
 func withUserID(req *http.Request, userID int64) *http.Request {
-	ctx := context.WithValue(req.Context(), "user_id", userID)
+	user := db.User{
+		ID:         userID,
+		Email:      "test@example.com",
+		TenantID:   "default",
+		RoleID:     "user",
+		IsVerified: true,
+	}
+	ctx := context.WithValue(req.Context(), contextkeys.UserContextKey, user)
 	return req.WithContext(ctx)
 }
 
@@ -106,22 +112,23 @@ func TestHandler_Dashboard_UserNotFound(t *testing.T) {
 	handler := NewHandler(userRepo, nil, dbConn, queries)
 
 	req := newRequest("GET", "/dashboard", nil)
-	req = withUserID(req, 1)
 	w := newResponseRecorder()
 
 	handler.Dashboard(w, req)
 
-	// Handler returns 404 when user not found
-	if w.Code != 404 {
-		t.Errorf("expected status 404, got %d", w.Code)
+	if w.Code != 303 {
+		t.Errorf("expected redirect status 303, got %d", w.Code)
 	}
 }
 
 func TestHandler_Dashboard_Success(t *testing.T) {
 	userRepo := &mockUserRepository{
 		user: db.User{
-			ID:    1,
-			Email: "test@example.com",
+			ID:         1,
+			Email:      "test@example.com",
+			TenantID:   "default",
+			RoleID:     "user",
+			IsVerified: true,
 		},
 	}
 	dbConn := &sql.DB{}
@@ -133,10 +140,8 @@ func TestHandler_Dashboard_Success(t *testing.T) {
 	req = withUserID(req, 1)
 	w := newResponseRecorder()
 
-	// Call handler directly (without middleware)
 	handler.Dashboard(w, req)
 
-	// Should render dashboard
 	if w.Code != 200 {
 		t.Errorf("expected status 200, got %d", w.Code)
 	}

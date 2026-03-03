@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/PauloHFS/goth/internal/db"
 	httpErr "github.com/PauloHFS/goth/internal/platform/http"
-	httpMiddleware "github.com/PauloHFS/goth/internal/platform/http/middleware"
+	"github.com/PauloHFS/goth/internal/platform/http/middleware"
 	"github.com/PauloHFS/goth/internal/view"
 	"github.com/PauloHFS/goth/internal/view/pages"
 	"github.com/a-h/templ"
@@ -33,26 +34,33 @@ func NewHandler(userRepo UserRepository, session *scs.SessionManager, dbConn *sq
 }
 
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id")
-	if userID == nil {
+	// Get user from context (set by RequireAuth middleware)
+	user, ok := middleware.GetUser(r.Context())
+	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	user, err := h.userRepo.GetByID(r.Context(), userID.(int64))
+	// List users for display
+	users, total, err := h.userRepo.ListPaginated(r.Context(), ListParams{
+		TenantID: "default",
+		Search:   r.URL.Query().Get("search"),
+		Page:     1,
+		PerPage:  10,
+	})
 	if err != nil {
-		httpErr.HandleError(w, r, httpErr.NewNotFoundError("user"), "get_user")
-		return
+		users = []db.User{user}
+		total = 1
 	}
 
-	users := []db.User{user}
-	pag := view.NewPagination(1, 1, 10)
+	pag := view.NewPagination(1, int(total), 10)
 	templ.Handler(pages.Dashboard(user, users, pag)).ServeHTTP(w, r)
 }
 
 func (h *Handler) AvatarUpload(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id")
-	if userID == nil {
+	// Get user from context (set by RequireAuth middleware)
+	user, ok := middleware.GetUser(r.Context())
+	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
@@ -81,23 +89,86 @@ func (h *Handler) AvatarUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = data
+	// Create avatars directory if not exists
+	avatarDir := "storage/avatars"
+	if err := os.MkdirAll(avatarDir, 0755); err != nil {
+		httpErr.HandleError(w, r, fmt.Errorf("failed to create avatar directory: %w", err), "upload_avatar")
+		return
+	}
 
-	filename := fmt.Sprintf("avatars/%d%s", userID.(int64), ext)
-	url := "/storage/" + filename
+	// Save file to disk
+	filename := fmt.Sprintf("%d%s", user.ID, ext)
+	filePath := filepath.Join(avatarDir, filename)
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		httpErr.HandleError(w, r, fmt.Errorf("failed to save avatar file: %w", err), "upload_avatar")
+		return
+	}
 
-	if err := h.userRepo.UpdateAvatar(r.Context(), userID.(int64), url); err != nil {
+	url := "/storage/avatars/" + filename
+
+	if err := h.userRepo.UpdateAvatar(r.Context(), user.ID, url); err != nil {
 		httpErr.HandleError(w, r, err, "update_avatar")
 		return
 	}
 
-	if _, err := w.Write([]byte("Avatar updated!")); err != nil {
+	// Redirect back to dashboard
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
+func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.GetUser(r.Context())
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+
+	if r.Method == "POST" {
+		// Handle profile update
+		name := r.FormValue("name")
+		bio := r.FormValue("bio")
+		_ = name // TODO: Update user profile
+		_ = bio
+		http.Redirect(w, r, "/profile", http.StatusSeeOther)
+		return
+	}
+
+	templ.Handler(pages.Profile(user)).ServeHTTP(w, r)
+}
+
+func (h *Handler) Settings(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.GetUser(r.Context())
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	templ.Handler(pages.Settings(user)).ServeHTTP(w, r)
+}
+
+func (h *Handler) Notifications(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.GetUser(r.Context())
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	// TODO: Load actual notifications
+	notifications := []pages.Notification{}
+	templ.Handler(pages.Notifications(user, notifications)).ServeHTTP(w, r)
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	auth := httpMiddleware.RequireAuth(h.session, h.queries, http.HandlerFunc(h.Dashboard))
+	auth := middleware.RequireAuth(h.session, h.queries, http.HandlerFunc(h.Dashboard))
 	mux.Handle("GET /dashboard", auth)
-	mux.HandleFunc("POST /profile/avatar", h.AvatarUpload)
+
+	profileAuth := middleware.RequireAuth(h.session, h.queries, http.HandlerFunc(h.Profile))
+	mux.Handle("GET /profile", profileAuth)
+	mux.Handle("POST /profile", profileAuth)
+
+	settingsAuth := middleware.RequireAuth(h.session, h.queries, http.HandlerFunc(h.Settings))
+	mux.Handle("GET /settings", settingsAuth)
+
+	notificationsAuth := middleware.RequireAuth(h.session, h.queries, http.HandlerFunc(h.Notifications))
+	mux.Handle("GET /notifications", notificationsAuth)
+
+	avatarAuth := middleware.RequireAuth(h.session, h.queries, http.HandlerFunc(h.AvatarUpload))
+	mux.Handle("POST /profile/avatar", avatarAuth)
 }

@@ -50,7 +50,7 @@ func NewHandler(service *Service, session *scs.SessionManager, dbConn *sql.DB, q
 // @Success 200 {string} string "Registration form HTML"
 // @Router /register [get]
 func (h *Handler) RegisterForm(w http.ResponseWriter, r *http.Request) {
-	templ.Handler(pages.Register("")).ServeHTTP(w, r)
+	templ.Handler(pages.Register("", nil)).ServeHTTP(w, r)
 }
 
 // RegisterSubmit processa novo registro de usuário
@@ -88,7 +88,7 @@ func (h *Handler) RegisterSubmit(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		// Metric
 		metrics.AuthRegistrationsTotal.WithLabelValues("failure").Inc()
-		templ.Handler(pages.Register(err.Error())).ServeHTTP(w, r)
+		templ.Handler(pages.Register(err.Error(), nil)).ServeHTTP(w, r)
 		return nil
 	}
 
@@ -107,7 +107,14 @@ func (h *Handler) RegisterSubmit(w http.ResponseWriter, r *http.Request) error {
 // @Success 200 {string} string "Login form HTML"
 // @Router /login [get]
 func (h *Handler) LoginForm(w http.ResponseWriter, r *http.Request) {
-	templ.Handler(pages.Login("")).ServeHTTP(w, r)
+	// Redirect if already logged in
+	userID := h.session.GetInt64(r.Context(), "user_id")
+	if userID != 0 {
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
+
+	templ.Handler(pages.Login("", nil)).ServeHTTP(w, r)
 }
 
 // LoginSubmit processa login de usuário
@@ -144,7 +151,7 @@ func (h *Handler) LoginSubmit(w http.ResponseWriter, r *http.Request) error {
 		h.auditLogger.LogLogin(ctx, 0, false, r.RemoteAddr, r.UserAgent())
 		// Metric
 		metrics.AuthLoginsTotal.WithLabelValues("failure").Inc()
-		templ.Handler(pages.Login(err.Error())).ServeHTTP(w, r)
+		templ.Handler(pages.Login(err.Error(), nil)).ServeHTTP(w, r)
 		return nil
 	}
 
@@ -198,7 +205,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) error {
 // @Success 200 {string} string "Forgot password form HTML"
 // @Router /forgot-password [get]
 func (h *Handler) ForgotPasswordForm(w http.ResponseWriter, r *http.Request) {
-	templ.Handler(pages.ForgotPassword("")).ServeHTTP(w, r)
+	templ.Handler(pages.ForgotPassword("", nil)).ServeHTTP(w, r)
 }
 
 // ForgotPasswordSubmit processa pedido de recuperação de senha
@@ -230,11 +237,11 @@ func (h *Handler) ForgotPasswordSubmit(w http.ResponseWriter, r *http.Request) e
 	h.auditLogger.LogPasswordReset(ctx, email, r.RemoteAddr, r.UserAgent())
 
 	if err != nil {
-		templ.Handler(pages.ForgotPassword(err.Error())).ServeHTTP(w, r)
+		templ.Handler(pages.ForgotPassword(err.Error(), nil)).ServeHTTP(w, r)
 		return nil
 	}
 
-	templ.Handler(pages.ForgotPassword("Se o e-mail existir, um link será enviado.")).ServeHTTP(w, r)
+	templ.Handler(pages.ForgotPassword("Se o e-mail existir, um link será enviado.", nil)).ServeHTTP(w, r)
 	return nil
 }
 
@@ -248,7 +255,7 @@ func (h *Handler) ForgotPasswordSubmit(w http.ResponseWriter, r *http.Request) e
 // @Router /reset-password [get]
 func (h *Handler) ResetPasswordForm(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
-	templ.Handler(pages.ResetPassword(token, "")).ServeHTTP(w, r)
+	templ.Handler(pages.ResetPassword(token, "", nil)).ServeHTTP(w, r)
 }
 
 // ResetPasswordSubmit processa reset de senha
@@ -276,7 +283,7 @@ func (h *Handler) ResetPasswordSubmit(w http.ResponseWriter, r *http.Request) er
 	})
 
 	if err != nil {
-		templ.Handler(pages.ResetPassword(token, err.Error())).ServeHTTP(w, r)
+		templ.Handler(pages.ResetPassword(token, err.Error(), nil)).ServeHTTP(w, r)
 		return nil
 	}
 

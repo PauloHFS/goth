@@ -1,0 +1,58 @@
+package pages
+
+import (
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view"
+	"github.com/PauloHFS/goth/internal/view/layout"
+)
+
+templ Profile(user db.User) {
+	@layout.Base("Perfil - GOTH Stack", db.Tenant{Name: "GOTH Stack"}, &user) {
+		<div class="mx-auto max-w-3xl">
+			<h1 class="text-3xl font-bold text-gray-900 dark:text-white">Meu Perfil</h1>
+			
+			<div class="mt-8 rounded-xl bg-white dark:bg-zinc-900 shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+				<div class="p-6">
+					<!-- Avatar Section -->
+					<div class="flex items-center gap-6">
+						<div class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-medium text-3xl">
+							if user.AvatarUrl.Valid {
+								<img src={ user.AvatarUrl.String } alt={ user.Email } class="h-full w-full rounded-full object-cover" />
+							} else {
+								<span>{ string(user.Email[0]) }</span>
+							}
+						</div>
+						<div>
+							<h2 class="text-xl font-semibold text-gray-900 dark:text-white">{ user.Email }</h2>
+							<p class="text-gray-600 dark:text-gray-400">Membro desde { user.CreatedAt.Time.Format("01/01/2006") }</p>
+						</div>
+					</div>
+
+					<!-- Profile Form -->
+					<form action="/profile" method="POST" class="mt-8 space-y-6">
+						<input type="hidden" name="csrf_token" value={ view.CSRFToken(ctx) } />
+						
+						<div>
+							<label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome</label>
+							<input type="text" id="name" name="name" value={ user.Email }
+								class="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 transition-colors" />
+						</div>
+
+						<div>
+							<label for="bio" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Bio</label>
+							<textarea id="bio" name="bio" rows="4"
+								class="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20 dark:border-gray-700 dark:bg-zinc-800 dark:text-white dark:placeholder-gray-500 transition-colors resize-none"></textarea>
+						</div>
+
+						<div class="flex justify-end gap-4">
+							<button type="submit"
+								class="rounded-xl bg-gray-900 px-6 py-3 text-base font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 transition-colors">
+								Salvar Alterações
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}

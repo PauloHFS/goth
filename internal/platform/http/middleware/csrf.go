@@ -37,6 +37,12 @@ func CSRFHandler(next http.Handler) http.Handler {
 	// nosurf envolve injectHandler
 	csrf := nosurf.New(injectHandler)
 
+	// Configurar para aceitar token do form
+	csrf.SetFailureHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Log de erro CSRF para debug
+		http.Error(w, "CSRF token validation failed", http.StatusBadRequest)
+	}))
+
 	// Bypass do Referer APENAS em desenvolvimento (APP_ENV=dev)
 	// Isso é necessário porque browsers não enviam Referer em localhost sem HTTPS
 	if os.Getenv("APP_ENV") == "dev" {

@@ -1,0 +1,41 @@
+# RBAC Policy for GOTH Stack
+# Format: p, subject, object, action
+#       : g, user, role
+
+# Admin role - full access to everything
+p, admin, *, view
+p, admin, *, create
+p, admin, *, edit
+p, admin, *, delete
+
+# User role - basic access
+p, user, dashboard, view
+p, user, profile, view
+p, user, profile, edit
+p, user, settings, view
+p, user, settings, edit
+p, user, 2fa, view
+p, user, 2fa, create
+p, user, 2fa, delete
+
+# Billing role - billing and payments
+p, billing, billing, view
+p, billing, billing, edit
+p, billing, invoices, view
+p, billing, payments, view
+p, billing, payments, create
+
+# Moderator role - content moderation
+p, moderator, content, view
+p, moderator, content, edit
+p, moderator, content, delete
+p, moderator, reports, view
+p, moderator, reports, edit
+
+# Support role - customer support
+p, support, tickets, view
+p, support, tickets, edit
+p, support, users, view
+
+# Default role assignments (examples)
+# g, user_id, role

@@ -1,0 +1,108 @@
+package pages
+
+import (
+	"github.com/PauloHFS/goth/internal/db"
+	"github.com/PauloHFS/goth/internal/view/layout"
+	"github.com/PauloHFS/goth/web/components"
+)
+
+templ About(user *db.User) {
+	@layout.Base("About - GOTH Stack", db.Tenant{Name: "GOTH Stack"}, user) {
+		<div class="py-20">
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				<!-- Hero -->
+				<div class="text-center mb-16">
+					<h1 class="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
+						About GOTH Stack
+					</h1>
+					<p class="mt-4 text-xl text-gray-600 dark:text-gray-400">
+						Building the future of web development, one line at a time.
+					</p>
+				</div>
+
+				<!-- Story Section -->
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
+					<div>
+						<h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-6">Our Story</h2>
+						<div class="space-y-4 text-gray-600 dark:text-gray-400">
+							<p>
+								GOTH Stack was born from a simple observation: modern web development had become unnecessarily complex. 
+								We believed there had to be a better way to build fast, secure, and beautiful web applications.
+							</p>
+							<p>
+								Founded in 2024, we set out to create a framework that combines the performance of Go with the simplicity 
+								of HTMX and the beauty of TailwindCSS. Our mission is to empower developers to build amazing things 
+								without getting bogged down in complexity.
+							</p>
+							<p>
+								Today, thousands of developers around the world use GOTH Stack to build everything from small hobby 
+								projects to enterprise-grade applications.
+							</p>
+						</div>
+					</div>
+					<div class="relative">
+						<div class="aspect-square rounded-3xl bg-gradient-to-br from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 flex items-center justify-center">
+							<span class="text-9xl font-bold text-white dark:text-gray-900">G</span>
+						</div>
+					</div>
+				</div>
+
+				<!-- Values Section -->
+				<div class="mb-20">
+					<h2 class="text-3xl font-bold text-gray-900 dark:text-white text-center mb-12">Our Values</h2>
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+						<div class="text-center p-6">
+							<div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 mb-4">
+								@components.LucideIcon("zap", "h-8 w-8 text-gray-900 dark:text-white")
+							</div>
+							<h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Simplicity</h3>
+							<p class="text-gray-600 dark:text-gray-400">We believe in elegant solutions that don't require unnecessary complexity.</p>
+						</div>
+						<div class="text-center p-6">
+							<div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 mb-4">
+								@components.LucideIcon("shield-check", "h-8 w-8 text-gray-900 dark:text-white")
+							</div>
+							<h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Security</h3>
+							<p class="text-gray-600 dark:text-gray-400">Security isn't an afterthought—it's built into everything we do.</p>
+						</div>
+						<div class="text-center p-6">
+							<div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800 mb-4">
+								@components.LucideIcon("users", "h-8 w-8 text-gray-900 dark:text-white")
+							</div>
+							<h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Community</h3>
+							<p class="text-gray-600 dark:text-gray-400">We're building more than code—we're fostering a community of makers.</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Team Section -->
+				<div>
+					<h2 class="text-3xl font-bold text-gray-900 dark:text-white text-center mb-12">Leadership</h2>
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+						<div class="text-center">
+							<div class="mx-auto h-32 w-32 rounded-full bg-gray-200 dark:bg-zinc-700 mb-4 flex items-center justify-center">
+								@components.LucideIcon("user", "h-16 w-16 text-gray-400")
+							</div>
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Paulo Hernane</h3>
+							<p class="text-gray-600 dark:text-gray-400">Founder & CEO</p>
+						</div>
+						<div class="text-center">
+							<div class="mx-auto h-32 w-32 rounded-full bg-gray-200 dark:bg-zinc-700 mb-4 flex items-center justify-center">
+								@components.LucideIcon("user", "h-16 w-16 text-gray-400")
+							</div>
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Alex Developer</h3>
+							<p class="text-gray-600 dark:text-gray-400">CTO</p>
+						</div>
+						<div class="text-center">
+							<div class="mx-auto h-32 w-32 rounded-full bg-gray-200 dark:bg-zinc-700 mb-4 flex items-center justify-center">
+								@components.LucideIcon("user", "h-16 w-16 text-gray-400")
+							</div>
+							<h3 class="text-lg font-semibold text-gray-900 dark:text-white">Sam Designer</h3>
+							<p class="text-gray-600 dark:text-gray-400">Head of Design</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
