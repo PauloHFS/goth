@@ -172,7 +172,10 @@ func (e *Enforcer) InitializeDefaultRoles() error {
 	for _, perm := range adminPermissions {
 		hasPolicy, _ := e.HasPolicy(perm)
 		if !hasPolicy {
-			e.AddPolicy(perm)
+			_, err := e.AddPolicy(perm)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -188,7 +191,10 @@ func (e *Enforcer) InitializeDefaultRoles() error {
 	for _, perm := range userPermissions {
 		hasPolicy, _ := e.HasPolicy(perm)
 		if !hasPolicy {
-			e.AddPolicy(perm)
+			_, err := e.AddPolicy(perm)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -204,7 +210,10 @@ func (e *Enforcer) InitializeDefaultRoles() error {
 	for _, perm := range billingPermissions {
 		hasPolicy, _ := e.HasPolicy(perm)
 		if !hasPolicy {
-			e.AddPolicy(perm)
+			_, err := e.AddPolicy(perm)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -220,7 +229,10 @@ func (e *Enforcer) InitializeDefaultRoles() error {
 	for _, perm := range moderatorPermissions {
 		hasPolicy, _ := e.HasPolicy(perm)
 		if !hasPolicy {
-			e.AddPolicy(perm)
+			_, err := e.AddPolicy(perm)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -229,15 +241,16 @@ func (e *Enforcer) InitializeDefaultRoles() error {
 
 // LoadPolicy reloads policy from file
 func (e *Enforcer) LoadPolicy() error {
-	return e.LoadPolicy()
+	return e.Enforcer.LoadPolicy()
 }
 
 // SavePolicy saves policy to file
 func (e *Enforcer) SavePolicy() error {
-	return e.SavePolicy()
+	return e.Enforcer.SavePolicy()
 }
 
 // ClearPolicy clears all policies
 func (e *Enforcer) ClearPolicy() error {
-	return e.ClearPolicy()
+	e.Enforcer.ClearPolicy()
+	return nil
 }
