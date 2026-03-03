@@ -82,6 +82,15 @@ test-coverage: test
 lint:
 	golangci-lint run
 
+# Security scan with gosec
+sec:
+	@command -v gosec >/dev/null 2>&1 || { \
+		echo "Installing gosec..."; \
+		go install github.com/securego/gosec/v2/cmd/gosec@latest; \
+	}
+	gosec -conf .gosec.json ./...
+	@echo "✓ Security scan complete"
+
 # Format code
 fmt:
 	$(GOFMT) ./...
@@ -204,6 +213,7 @@ help:
 	@echo "  test            - Run tests"
 	@echo "  coverage        - Run tests + generate HTML report"
 	@echo "  lint            - Run linter"
+	@echo "  sec             - Run security scan with gosec"
 	@echo "  fmt             - Format code"
 	@echo "  vet             - Vet code"
 	@echo "  deps            - Install dependencies"

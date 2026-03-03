@@ -119,7 +119,9 @@ func RunServer(assetsFS embed.FS) error {
 		_ = dbConn.Close()
 	}()
 
-	if err := os.MkdirAll("storage/avatars", 0755); err != nil {
+	// Create storage directories with secure permissions
+	// 0750: owner rwx, group rx, others none
+	if err := os.MkdirAll("storage/avatars", 0750); err != nil {
 		logger.Error("failed to create storage directories", "error", err)
 		return fmt.Errorf("failed to create storage directories: %w", err)
 	}

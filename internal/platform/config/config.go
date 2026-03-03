@@ -276,7 +276,13 @@ func generateSecureSecret() string {
 func loadYAMLConfig(env string) (*EnvironmentConfig, *DefaultsConfig, error) {
 	cfgPath := filepath.Join(".", "config.yaml")
 
-	data, err := os.ReadFile(cfgPath)
+	// Prevent path traversal attacks by cleaning the path
+	cleanPath := filepath.Clean(cfgPath)
+	if !filepath.IsLocal(cleanPath) {
+		return getDefaultConfig(env), getDefaults(), nil
+	}
+
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return getDefaultConfig(env), getDefaults(), nil
 	}

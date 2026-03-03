@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -116,7 +117,8 @@ func main() {
 
 	// Output
 	if *outputFile != "" {
-		if err := os.WriteFile(*outputFile, []byte(report), 0644); err != nil {
+		// Use 0600 for file permissions (owner rw only) - benchmark reports may contain sensitive performance data
+		if err := os.WriteFile(*outputFile, []byte(report), 0600); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
 			os.Exit(1)
 		}
@@ -139,7 +141,13 @@ func main() {
 }
 
 func loadGolden(filename string) (*BenchmarkGolden, error) {
-	data, err := os.ReadFile(filename)
+	// Prevent path traversal attacks by cleaning the path
+	cleanPath := filepath.Clean(filename)
+	if !filepath.IsLocal(cleanPath) {
+		return nil, fmt.Errorf("invalid golden file path: must be within current directory")
+	}
+
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return nil, err
 	}

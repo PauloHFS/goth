@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/PauloHFS/goth/internal/db"
 	httpErr "github.com/PauloHFS/goth/internal/platform/http"
@@ -90,16 +91,28 @@ func (h *Handler) AvatarUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create avatars directory if not exists
+	// Use 0750 for directory permissions (owner rwx, group rx, others none)
 	avatarDir := "storage/avatars"
-	if err := os.MkdirAll(avatarDir, 0755); err != nil {
+	if err := os.MkdirAll(avatarDir, 0750); err != nil {
 		httpErr.HandleError(w, r, fmt.Errorf("failed to create avatar directory: %w", err), "upload_avatar")
 		return
 	}
 
 	// Save file to disk
+	// Use 0600 for file permissions (owner rw, group none, others none) - avatar files are private
+	// Sanitize filename to prevent path traversal
 	filename := fmt.Sprintf("%d%s", user.ID, ext)
+	filename = filepath.Base(filename) // Ensure no path components
 	filePath := filepath.Join(avatarDir, filename)
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+
+	// Verify final path is within avatarDir
+	cleanPath := filepath.Clean(filePath)
+	if !strings.HasPrefix(cleanPath, avatarDir) {
+		httpErr.HandleError(w, r, httpErr.NewValidationError("invalid file path", nil), "upload_avatar")
+		return
+	}
+
+	if err := os.WriteFile(cleanPath, data, 0600); err != nil {
 		httpErr.HandleError(w, r, fmt.Errorf("failed to save avatar file: %w", err), "upload_avatar")
 		return
 	}
@@ -123,6 +136,9 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
+		// Limit request body size to prevent memory exhaustion (max 1MB for form data)
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
+
 		// Handle profile update
 		name := r.FormValue("name")
 		bio := r.FormValue("bio")

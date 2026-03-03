@@ -170,6 +170,36 @@ if err != nil {
 
 GOTH maintains a rigorous testing structure. All contributions must include appropriate tests.
 
+### Security Testing
+
+**Run security scans:**
+```bash
+make sec
+```
+
+This runs `gosec` with project-specific configuration (`.gosec.json`).
+
+**Security requirements:**
+- No high-severity issues in new code
+- Path traversal prevention for file operations
+- Request body size limits for form handlers
+- Secure file permissions (0600 for files, 0750 for directories)
+
+**Example security fixes:**
+```go
+// Limit request body size to prevent memory exhaustion
+r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
+
+// Prevent path traversal
+cleanPath := filepath.Clean(userPath)
+if !filepath.IsLocal(cleanPath) {
+    return fmt.Errorf("invalid path")
+}
+
+// Use secure file permissions
+os.WriteFile(path, data, 0600) // Owner read/write only
+```
+
 ### Unit Tests
 
 **Location:** Alongside source code (`*_test.go`)
@@ -218,9 +248,15 @@ make test-integration
 make test-e2e
 ```
 
+**Server Management:**
+E2E tests now automatically manage the test server lifecycle:
+- Server is built and started before tests run
+- Server is stopped after tests complete
+- Test database is cleaned up automatically
+
 **Requirements:**
 - Playwright browsers installed: `npx playwright install --with-deps chromium`
-- Server running on `localhost:8080`
+- No need to start server manually (done automatically)
 
 **Example:**
 ```go
@@ -286,6 +322,7 @@ make test-cover
    ```bash
    make generate
    make lint
+   make sec        # Security scan
    make test
    make test-integration
    make bench
@@ -306,6 +343,7 @@ Before submitting a pull request, ensure:
 
 - [ ] Code follows project style guidelines (`make lint`)
 - [ ] All generated files are up to date (`make generate`)
+- [ ] Security scan passes (`make sec`)
 - [ ] Unit tests pass (`make test`)
 - [ ] Integration tests pass (`make test-integration`)
 - [ ] E2E tests pass (if applicable) (`make test-e2e`)

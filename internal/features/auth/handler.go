@@ -69,6 +69,9 @@ func (h *Handler) RegisterSubmit(w http.ResponseWriter, r *http.Request) error {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	// Limit request body size to prevent memory exhaustion (max 1MB for form data)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
+
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	tenantID := r.Header.Get("X-Tenant-ID")
@@ -132,6 +135,9 @@ func (h *Handler) LoginSubmit(w http.ResponseWriter, r *http.Request) error {
 	// Timeout de 5 segundos para operações de database
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	// Limit request body size to prevent memory exhaustion (max 1MB for form data)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 
 	email := r.FormValue("email")
 	password := r.FormValue("password")
@@ -222,6 +228,9 @@ func (h *Handler) ForgotPasswordSubmit(w http.ResponseWriter, r *http.Request) e
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	// Limit request body size to prevent memory exhaustion (max 1MB for form data)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
+
 	email := r.FormValue("email")
 	tenantID := r.Header.Get("X-Tenant-ID")
 	if tenantID == "" {
@@ -273,6 +282,9 @@ func (h *Handler) ResetPasswordSubmit(w http.ResponseWriter, r *http.Request) er
 	// Timeout de 5 segundos para operações de database
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	// Limit request body size to prevent memory exhaustion (max 1MB for form data)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 
 	token := r.FormValue("token")
 	password := r.FormValue("password")
