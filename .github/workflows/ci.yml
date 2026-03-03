@@ -55,9 +55,8 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
-          version: v1.64.8
+          version: v1.62.2
           args: --timeout=5m
-          install-mode: from-source
 
       - name: go vet
         run: go vet ./...
