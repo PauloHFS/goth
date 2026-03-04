@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -93,7 +94,7 @@ func boolToString(b bool) string {
 }
 
 func stringToString(i int) string {
-	return string(rune(i + '0'))
+	return strconv.Itoa(i)
 }
 
 type corsBuilder struct {
@@ -137,4 +138,33 @@ func (b *corsBuilder) Build() CORSConfig {
 		AllowCredentials: b.config.AllowCredentials,
 		MaxAge:           b.config.MaxAge,
 	}
+}
+
+func NewCORSConfigFromStrings(
+	origins, methods, headers, exposedHeaders string,
+	allowCredentials bool,
+	maxAge int,
+) CORSConfig {
+	return CORSConfig{
+		AllowedOrigins:   parseCommaList(origins),
+		AllowedMethods:   parseCommaList(methods),
+		AllowedHeaders:   parseCommaList(headers),
+		ExposedHeaders:   parseCommaList(exposedHeaders),
+		AllowCredentials: allowCredentials,
+		MaxAge:           maxAge,
+	}
+}
+
+func parseCommaList(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var result []string
+	for _, item := range strings.Split(s, ",") {
+		trimmed := strings.TrimSpace(item)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

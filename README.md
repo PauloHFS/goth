@@ -65,6 +65,11 @@ A modern, minimalist, production-ready full-stack boilerplate for rapid MVP deve
 - **Health Checks** - Health monitoring
 - **Graceful Shutdown** - Elegant shutdown
 
+### API
+- **REST API v1** - Versioned API at /api/v1/
+- **WebSockets** - Real-time bidirectional communication
+- **SSE** - Server-Sent Events
+
 ---
 
 ## Technology Stack
@@ -77,6 +82,7 @@ A modern, minimalist, production-ready full-stack boilerplate for rapid MVP deve
 | **Interactivity** | HTMX | 2.x |
 | **JavaScript** | Alpine.js | 3.x |
 | **Styling** | Tailwind CSS | 4.x |
+| **WebSockets** | gorilla/websocket | 1.5.x |
 | **Auth** | OAuth2, 2FA/TOTP | - |
 | **RBAC** | Casbin | 2.x |
 | **Tracing** | OpenTelemetry | 1.x |
@@ -121,6 +127,7 @@ task install:tools
 ```bash
 cp .env.example .env
 # Edite .env com suas credenciais
+# Opcional: configure CORS_ALLOWED_ORIGINS paraAllow origins
 ```
 
 ### 4. Rode migrações
@@ -162,12 +169,19 @@ goth/
 │   │   └── user/         # User management
 │   ├── platform/          # Shared platform
 │   │   ├── config/       # Configuration
-│   │   ├── http/         # HTTP handlers
+│   │   ├── featureflags/ # Feature flags (weak.Pointer cache)
+│   │   ├── http/         # HTTP handlers + middleware
+│   │   │   └── middleware/
+│   │   │       ├── cors.go      # CORS (configurable via env)
+│   │   │       ├── security.go  # Security headers
+│   │   │       └── ...
 │   │   ├── logging/      # Logging
 │   │   ├── metrics/      # Metrics
 │   │   ├── observability/# OTel, Grafana
-│   │   ├── security/     # RBAC, 2FA
-│   │   └── seo/          # Sitemap, Robots.txt
+│   │   ├── secrets/     # Secret management
+│   │   ├── security/    # RBAC, 2FA
+│   │   ├── seo/         # Sitemap, Robots.txt
+│   │   └── websocket/    # WebSocket hub
 │   └── view/             # Templ templates
 ├── migrations/            # Database migrations
 ├── web/
@@ -177,7 +191,8 @@ goth/
 ├── test/                 # Test files
 ├── docker/               # Docker configs
 ├── docs/                 # Documentation
-└── storage/              # File storage
+├── storage/              # File storage
+└── LICENSE               # MIT License
 ```
 
 ---
