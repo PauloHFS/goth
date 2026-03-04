@@ -20,13 +20,13 @@ func NewHandler(manager *Manager) *Handler {
 
 // RegisterRoutes registra as rotas da API
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/feature-flags", h.listFlags)
-	mux.HandleFunc("GET /api/feature-flags/{name}", h.getFlag)
-	mux.HandleFunc("POST /api/feature-flags", h.createFlag)
-	mux.HandleFunc("PUT /api/feature-flags/{id}", h.updateFlag)
-	mux.HandleFunc("DELETE /api/feature-flags/{id}", h.deleteFlag)
-	mux.HandleFunc("POST /api/feature-flags/{id}/toggle", h.toggleFlag)
-	mux.HandleFunc("GET /api/feature-flags/check/{name}", h.checkFlag)
+	mux.HandleFunc("GET /api/v1/feature-flags", h.listFlags)
+	mux.HandleFunc("GET /api/v1/feature-flags/{name}", h.getFlag)
+	mux.HandleFunc("POST /api/v1/feature-flags", h.createFlag)
+	mux.HandleFunc("PUT /api/v1/feature-flags/{id}", h.updateFlag)
+	mux.HandleFunc("DELETE /api/v1/feature-flags/{id}", h.deleteFlag)
+	mux.HandleFunc("POST /api/v1/feature-flags/{id}/toggle", h.toggleFlag)
+	mux.HandleFunc("GET /api/v1/feature-flags/check/{name}", h.checkFlag)
 }
 
 // listFlags retorna todas as feature flags
@@ -35,7 +35,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 // @Tags Feature Flags
 // @Produce json
 // @Success 200 {array} FeatureFlag
-// @Router /api/feature-flags [get]
+// @Router /api/v1/feature-flags [get]
 func (h *Handler) listFlags(w http.ResponseWriter, r *http.Request) {
 	tenantID := r.Header.Get("X-Tenant-ID")
 	if tenantID == "" {
@@ -63,7 +63,7 @@ func (h *Handler) listFlags(w http.ResponseWriter, r *http.Request) {
 // @Param name path string true "Feature flag name"
 // @Success 200 {object} FeatureFlag
 // @Success 404 {object} map[string]string
-// @Router /api/feature-flags/{name} [get]
+// @Router /api/v1/feature-flags/{name} [get]
 func (h *Handler) getFlag(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	tenantID := r.Header.Get("X-Tenant-ID")
@@ -103,7 +103,7 @@ func (h *Handler) getFlag(w http.ResponseWriter, r *http.Request) {
 // @Param flag body FeatureFlagInput true "Feature flag data"
 // @Success 201 {object} FeatureFlag
 // @Success 400 {object} map[string]string
-// @Router /api/feature-flags [post]
+// @Router /api/v1/feature-flags [post]
 func (h *Handler) createFlag(w http.ResponseWriter, r *http.Request) {
 	var input FeatureFlagInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -141,7 +141,7 @@ func (h *Handler) createFlag(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} FeatureFlag
 // @Success 400 {object} map[string]string
 // @Success 404 {object} map[string]string
-// @Router /api/feature-flags/{id} [put]
+// @Router /api/v1/feature-flags/{id} [put]
 func (h *Handler) updateFlag(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -178,7 +178,7 @@ func (h *Handler) updateFlag(w http.ResponseWriter, r *http.Request) {
 // @Param id path int true "Feature flag ID"
 // @Success 204
 // @Success 404 {object} map[string]string
-// @Router /api/feature-flags/{id} [delete]
+// @Router /api/v1/feature-flags/{id} [delete]
 func (h *Handler) deleteFlag(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -204,7 +204,7 @@ func (h *Handler) deleteFlag(w http.ResponseWriter, r *http.Request) {
 // @Param id path int true "Feature flag ID"
 // @Success 200 {object} FeatureFlag
 // @Success 404 {object} map[string]string
-// @Router /api/feature-flags/{id}/toggle [post]
+// @Router /api/v1/feature-flags/{id}/toggle [post]
 func (h *Handler) toggleFlag(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -234,7 +234,7 @@ func (h *Handler) toggleFlag(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Param name path string true "Feature flag name"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/feature-flags/check/{name} [get]
+// @Router /api/v1/feature-flags/check/{name} [get]
 func (h *Handler) checkFlag(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	tenantID := r.Header.Get("X-Tenant-ID")

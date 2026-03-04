@@ -119,8 +119,8 @@ func NewLogLevelHandler() *LogLevelHandler {
 
 // RegisterRoutes registra as rotas da API
 func (h *LogLevelHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/log-level", h.getLevel)
-	mux.HandleFunc("PUT /api/log-level", h.setLevel)
+	mux.HandleFunc("GET /api/v1/log-level", h.getLevel)
+	mux.HandleFunc("PUT /api/v1/log-level", h.setLevel)
 }
 
 // LevelResponse representa a resposta da API
@@ -139,7 +139,7 @@ type LevelRequest struct {
 // @Tags Logging
 // @Produce json
 // @Success 200 {object} LevelResponse
-// @Router /api/log-level [get]
+// @Router /api/v1/log-level [get]
 func (h *LogLevelHandler) getLevel(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, r, LevelResponse{
 		Level: GetGlobalLevel().String(),
@@ -155,7 +155,7 @@ func (h *LogLevelHandler) getLevel(w http.ResponseWriter, r *http.Request) {
 // @Param level body LevelRequest true "New log level (debug, info, warn, error)"
 // @Success 200 {object} LevelResponse
 // @Failure 400 {object} map[string]string
-// @Router /api/log-level [put]
+// @Router /api/v1/log-level [put]
 func (h *LogLevelHandler) setLevel(w http.ResponseWriter, r *http.Request) {
 	var req LevelRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

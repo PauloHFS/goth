@@ -33,6 +33,7 @@ import (
 	"github.com/PauloHFS/goth/internal/platform/secrets"
 	"github.com/PauloHFS/goth/internal/platform/security/rbac"
 	sitemap "github.com/PauloHFS/goth/internal/platform/seo"
+	ws "github.com/PauloHFS/goth/internal/platform/websocket"
 	"github.com/PauloHFS/goth/internal/routes"
 	"github.com/PauloHFS/goth/internal/view/pages"
 	"github.com/a-h/templ"
@@ -143,6 +144,9 @@ func RunServer(assetsFS embed.FS) error {
 	defer sseBroker.Shutdown()
 	sseHandler := featuresSSE.NewHandler(sseBroker, sessionManager)
 
+	wsHub := ws.NewHub()
+	go wsHub.Run()
+
 	w := worker.New(cfg, dbConn, queries, logger, sseBroker)
 	if err := w.RescueZombies(workerCtx); err != nil {
 		logger.Error("zombie hunter failed", "error", err)
@@ -158,7 +162,7 @@ func RunServer(assetsFS embed.FS) error {
 
 	// Feature: Feature Flags
 	ffRepo := featureflags.NewRepository(dbConn)
-	ffManager := featureflags.NewManager(ffRepo, 5*time.Minute)
+	ffManager := featureflags.NewManager(ffRepo)
 	ffHandler := featureflags.NewHandler(ffManager)
 
 	// Start DB stats collector
@@ -267,6 +271,11 @@ func RunServer(assetsFS embed.FS) error {
 
 	mux.Handle("GET /metrics", promhttp.Handler())
 	mux.Handle("GET /events", sseHandler)
+	mux.Handle("GET /ws", wsHub.Handler(func(client *ws.Client) {
+		go client.ReadPump(func(message []byte) {
+			wsHub.Broadcast(message)
+		})
+	}))
 	mux.Handle("GET /swagger/", httpSwagger.WrapHandler)
 
 	// SEO e PWA routes
@@ -373,6 +382,24 @@ func RunServer(assetsFS embed.FS) error {
 		templ.Handler(pages.AdminUsers(userPtr)).ServeHTTP(w, r)
 	})
 
+	// Redirect /api/* to /api/v1/* for backward compatibility
+	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
+		newPath := "/api/v1" + r.URL.Path[len("/api"):]
+		http.Redirect(w, r, newPath, http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("PUT /api/", func(w http.ResponseWriter, r *http.Request) {
+		newPath := "/api/v1" + r.URL.Path[len("/api"):]
+		http.Redirect(w, r, newPath, http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("POST /api/", func(w http.ResponseWriter, r *http.Request) {
+		newPath := "/api/v1" + r.URL.Path[len("/api"):]
+		http.Redirect(w, r, newPath, http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("DELETE /api/", func(w http.ResponseWriter, r *http.Request) {
+		newPath := "/api/v1" + r.URL.Path[len("/api"):]
+		http.Redirect(w, r, newPath, http.StatusMovedPermanently)
+	})
+
 	// Feature Flags routes
 	ffHandler.RegisterRoutes(mux)
 
@@ -452,6 +479,14 @@ func RunServer(assetsFS embed.FS) error {
 
 	// Rate limiting é feito pelo Traefik (ver traefik/dynamic/config.yml)
 	// Middleware chain foca em segurança e observabilidade
+	corsConfig := httpMiddleware.NewCORSConfigFromStrings(
+		cfg.CORSAllowedOrigins,
+		cfg.CORSAllowedMethods,
+		cfg.CORSAllowedHeaders,
+		cfg.CORSExposedHeaders,
+		cfg.CORSAllowCredentials,
+		cfg.CORSMaxAge,
+	)
 	handler := httpMiddleware.Recovery(
 		httpMiddleware.TenantExtractor("default")(
 			httpMiddleware.Tracing( // Tracing antes do Logger para correlation de trace_id/span_id
@@ -459,8 +494,10 @@ func RunServer(assetsFS embed.FS) error {
 					httpMiddleware.Locale(
 						sessionManager.LoadAndSave(
 							httpMiddleware.RequestID( // Request ID antes do logger para correlation
-								httpMiddleware.SecurityHeaders(cfg.Env == "prod")( // Security headers
-									httpMiddleware.AddLoggerToContext(logger, csrfHandler),
+								httpMiddleware.CORS(&corsConfig)(
+									httpMiddleware.SecurityHeaders(cfg.Env == "prod")( // Security headers
+										httpMiddleware.AddLoggerToContext(logger, csrfHandler),
+									),
 								),
 							),
 						),

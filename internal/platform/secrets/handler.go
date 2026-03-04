@@ -23,9 +23,9 @@ func NewHandler(manager *Manager, env string) *Handler {
 
 // RegisterRoutes registra rotas da API
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/secrets/status", h.getStatus)
-	mux.HandleFunc("POST /api/secrets/reload", h.reloadSecrets)
-	mux.HandleFunc("POST /api/secrets/rotate", h.rotateSecret)
+	mux.HandleFunc("GET /api/v1/secrets/status", h.getStatus)
+	mux.HandleFunc("POST /api/v1/secrets/reload", h.reloadSecrets)
+	mux.HandleFunc("POST /api/v1/secrets/rotate", h.rotateSecret)
 }
 
 // getStatus retorna status do secret manager
@@ -34,7 +34,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 // @Tags Secrets
 // @Produce json
 // @Success 200 {object} Status
-// @Router /api/secrets/status [get]
+// @Router /api/v1/secrets/status [get]
 func (h *Handler) getStatus(w http.ResponseWriter, r *http.Request) {
 	status := h.manager.GetStatus(h.env)
 	respondJSON(w, r, status, http.StatusOK)
@@ -47,7 +47,7 @@ func (h *Handler) getStatus(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Success 200 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /api/secrets/reload [post]
+// @Router /api/v1/secrets/reload [post]
 func (h *Handler) reloadSecrets(w http.ResponseWriter, r *http.Request) {
 	if err := h.manager.ManualReload(); err != nil {
 		respondError(w, r, "Failed to reload secrets: "+err.Error(), http.StatusInternalServerError)
@@ -66,7 +66,7 @@ func (h *Handler) reloadSecrets(w http.ResponseWriter, r *http.Request) {
 // @Param secret body RotateRequest true "Secret type and new value"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
-// @Router /api/secrets/rotate [post]
+// @Router /api/v1/secrets/rotate [post]
 func (h *Handler) rotateSecret(w http.ResponseWriter, r *http.Request) {
 	var req RotateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

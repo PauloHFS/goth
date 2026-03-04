@@ -74,6 +74,14 @@ environments:
       metrics: true
       profiling: false
 
+    cors:
+      allowed_origins: "${CORS_ALLOWED_ORIGINS:http://localhost:8080,http://localhost:3000}"
+      allowed_methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      allowed_headers: "Content-Type,Authorization,X-Requested-With,X-CSRF-Token"
+      exposed_headers: "Content-Length,X-CSRF-Token"
+      allow_credentials: true
+      max_age: 3600
+
   staging:
     # Ambiente de homologação (APP_ENV=staging)
     # Espelha produção com dados de teste
@@ -117,6 +125,14 @@ environments:
       metrics: true
       profiling: true
 
+    cors:
+      allowed_origins: "${CORS_ALLOWED_ORIGINS:http://staging.goth.com}"
+      allowed_methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      allowed_headers: "Content-Type,Authorization,X-Requested-With,X-CSRF-Token"
+      exposed_headers: "Content-Length,X-CSRF-Token"
+      allow_credentials: true
+      max_age: 3600
+
   prod:
     # Produção (APP_ENV=prod)
     # Otimizado para performance e segurança
@@ -159,3 +175,11 @@ environments:
       swagger: false
       metrics: true
       profiling: false
+
+    cors:
+      allowed_origins: "${CORS_ALLOWED_ORIGINS:https://goth.com}"
+      allowed_methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      allowed_headers: "Content-Type,Authorization,X-Requested-With,X-CSRF-Token"
+      exposed_headers: "Content-Length,X-CSRF-Token"
+      allow_credentials: true
+      max_age: 3600

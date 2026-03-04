@@ -51,6 +51,13 @@ type Config struct {
 	CPUMultiplier float64
 	MinWorkers    int
 	MaxWorkers    int
+	// CORS
+	CORSAllowedOrigins   string
+	CORSAllowedMethods   string
+	CORSAllowedHeaders   string
+	CORSExposedHeaders   string
+	CORSAllowCredentials bool
+	CORSMaxAge           int
 }
 
 type YAMLConfig struct {
@@ -66,6 +73,7 @@ type EnvironmentConfig struct {
 	SMTP     SMTPConfig     `yaml:"smtp"`
 	Features FeaturesConfig `yaml:"features"`
 	Workers  WorkersConfig  `yaml:"workers"`
+	CORS     CORSConfig     `yaml:"cors"`
 }
 
 type ServerConfig struct {
@@ -110,6 +118,15 @@ type FeaturesConfig struct {
 	Swagger   bool `yaml:"swagger"`
 	Metrics   bool `yaml:"metrics"`
 	Profiling bool `yaml:"profiling"`
+}
+
+type CORSConfig struct {
+	AllowedOrigins   string `yaml:"allowed_origins"`
+	AllowedMethods   string `yaml:"allowed_methods"`
+	AllowedHeaders   string `yaml:"allowed_headers"`
+	ExposedHeaders   string `yaml:"exposed_headers"`
+	AllowCredentials bool   `yaml:"allow_credentials"`
+	MaxAge           int    `yaml:"max_age"`
 }
 
 type DefaultsConfig struct {
@@ -188,6 +205,13 @@ func Load() (*Config, error) {
 		CPUMultiplier:   yamlCfg.Workers.CPUMultiplier,
 		MinWorkers:      yamlCfg.Workers.MinWorkers,
 		MaxWorkers:      yamlCfg.Workers.MaxWorkers,
+		// CORS
+		CORSAllowedOrigins:   resolveEnvVar(yamlCfg.CORS.AllowedOrigins, "http://localhost:8080,http://localhost:3000"),
+		CORSAllowedMethods:   yamlCfg.CORS.AllowedMethods,
+		CORSAllowedHeaders:   yamlCfg.CORS.AllowedHeaders,
+		CORSExposedHeaders:   yamlCfg.CORS.ExposedHeaders,
+		CORSAllowCredentials: yamlCfg.CORS.AllowCredentials,
+		CORSMaxAge:           yamlCfg.CORS.MaxAge,
 	}
 
 	if cfg.ReadTimeout == 0 {
