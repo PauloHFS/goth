@@ -71,7 +71,7 @@ jobs:
             ./cmd/api
 
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: goth-${{ matrix.os }}-${{ matrix.arch }}
           generate_release_notes: false
@@ -108,7 +108,7 @@ jobs:
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}" >> /tmp/changelog.md
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: /tmp/changelog.md
           generate_release_notes: false
