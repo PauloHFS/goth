@@ -8,7 +8,7 @@
     "watch:css": "npx @tailwindcss/cli -i ./web/static/assets/css/tailwind.css -o ./web/static/assets/styles.css --watch"
   },
   "dependencies": {
-    "@tailwindcss/cli": "^4.2.1",
+    "@tailwindcss/cli": "^4.2.2",
     "tailwindcss": "^4.2.1"
   }
 }
